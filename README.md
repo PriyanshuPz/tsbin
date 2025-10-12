@@ -147,10 +147,10 @@ npx tsbin snippet "Hello World" --passcode 1234
 - [ ] Build CLI for upload, download, and snippet sharing
 - [ ] Integrate Telegram bot for storage
 - [ ] Integrate Appwrite for authentication and metadata management
-- [ ] Implement local encryption & decryption
-- [ ] Add optional passcode-protected links
-- [ ] Implement temporary file expiry
-- [ ] Build lightweight web interface
+- [x] Implement local encryption & decryption
+- [x] Add optional passcode-protected links
+- [x] Implement temporary file expiry
+- [x] Build lightweight web interface
 - [ ] Detailed documentation for contributors
 
 ---
