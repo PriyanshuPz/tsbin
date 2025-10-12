@@ -242,6 +242,24 @@ export default function MainBin({}: MainBinProps) {
             <br /> No signup required. Upload up to 3 files (20MB each, 30MB
             total).
           </p>
+
+          {/* Open Source Banner */}
+          <div className="mt-6 inline-flex items-center space-x-4 text-sm text-gray-500">
+            <span className="flex items-center space-x-1">
+              <span>⭐</span>
+              <span>Open Source</span>
+            </span>
+            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+            <span className="flex items-center space-x-1">
+              <span>🔒</span>
+              <span>End-to-End Encrypted</span>
+            </span>
+            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+            <span className="flex items-center space-x-1">
+              <span>🚀</span>
+              <span>No Registration</span>
+            </span>
+          </div>
         </div>
 
         <div className="mb-8">
@@ -445,7 +463,174 @@ export default function MainBin({}: MainBinProps) {
         </div>
       </div>
 
-      <footer className="text-center py-8 border-t border-gray-100 mt-16">
+      {/* Roadmap & Contribution Section */}
+      <div className="bg-gray-50 border-t border-gray-100">
+        <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-light text-gray-800 mb-4">
+              🚀 Roadmap & Open Source
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              tsbin is actively being developed with exciting features planned.
+              Join our community and help shape the future!
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 mb-8">
+            {/* Current Features */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
+                <span className="mr-2">✅</span>
+                Current Features
+              </h3>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  End-to-end encryption (AES-GCM)
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  Text and file sharing
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  Custom passcode protection
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  Expiration dates
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  Image preview & file downloads
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  Rate limiting & security
+                </li>
+              </ul>
+            </div>
+
+            {/* Upcoming Features */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
+                <span className="mr-2">🔮</span>
+                Coming Soon
+              </h3>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  Larger file support (chunked uploads)
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  Video/audio preview players
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  Batch file operations
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  API endpoints for developers
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  Mobile app (React Native)
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  Self-hosting guide
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Contribution Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-800 mb-3">
+                💻 Open Source & Community
+              </h3>
+              <p className="text-gray-600 mb-4 max-w-2xl mx-auto">
+                tsbin is completely open source! We welcome contributions, bug
+                reports, and feature requests from the community.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <a
+                  href="https://github.com/PriyanshuPz/tsbin"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors duration-200 text-sm font-medium"
+                >
+                  <span className="mr-2">⭐</span>
+                  Star on GitHub
+                </a>
+
+                <a
+                  href="https://github.com/PriyanshuPz/tsbin/fork"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200 text-sm font-medium"
+                >
+                  <span className="mr-2">🍴</span>
+                  Fork & Contribute
+                </a>
+
+                <a
+                  href="https://github.com/PriyanshuPz/tsbin/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors duration-200 text-sm font-medium"
+                >
+                  <span className="mr-2">🐛</span>
+                  Report Issues
+                </a>
+              </div>
+
+              <div className="mt-4 text-xs text-gray-500">
+                <p>Built with ❤️ using React, NestJS, and modern encryption</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tech Stack */}
+          <div className="mt-8 text-center">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">
+              Tech Stack
+            </h4>
+            <div className="flex flex-wrap justify-center items-center space-x-6 text-xs text-gray-500">
+              <span className="flex items-center space-x-1">
+                <img
+                  src="https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black"
+                  alt="React"
+                />
+              </span>
+              <span className="flex items-center space-x-1">
+                <img
+                  src="https://img.shields.io/badge/NestJS-E0234E?style=flat&logo=nestjs&logoColor=white"
+                  alt="NestJS"
+                />
+              </span>
+              <span className="flex items-center space-x-1">
+                <img
+                  src="https://img.shields.io/badge/Telegram-26A5E4?style=flat&logo=telegram&logoColor=white"
+                  alt="Telegram"
+                />
+              </span>
+              <span className="flex items-center space-x-1">
+                <img
+                  src="https://img.shields.io/badge/AppWrite-E0234E?style=flat&logo=AppWrite&logoColor=white"
+                  alt="Appwrite"
+                />
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer className="text-center py-8 border-t border-gray-100">
         <p className="text-xs text-gray-400">powered by tsbin</p>
       </footer>
     </div>
