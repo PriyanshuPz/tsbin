@@ -81,18 +81,28 @@ export default function MainBin({}: MainBinProps) {
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
 
-    // support up to 5 files
-    if (selectedFiles.length + files.length > 5) {
-      toast.error("You can upload up to 5 files at a time.");
+    // Support up to 3 files for better stability
+    if (selectedFiles.length + files.length > 3) {
+      toast.error("You can upload up to 3 files at a time.");
       return;
     }
 
-    // support up to 50MB total
+    // Check individual file size limit (20MB per file)
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error(
+          `File "${file.name}" is too large. Maximum size is 20MB per file.`
+        );
+        return;
+      }
+    }
+
+    // Support up to 30MB total
     const totalSize =
       selectedFiles.reduce((acc, f) => acc + f.file.size, 0) +
       Array.from(files).reduce((acc, f) => acc + f.size, 0);
-    if (totalSize > 50 * 1024 * 1024) {
-      toast.error("Total file size cannot exceed 50MB.");
+    if (totalSize > 30 * 1024 * 1024) {
+      toast.error("Total file size cannot exceed 30MB.");
       return;
     }
 
@@ -229,7 +239,8 @@ export default function MainBin({}: MainBinProps) {
           </h1>
           <p className="text-lg text-gray-600 font-light max-w-2xl mx-auto">
             A simple place to store and share your text, files, and media.
-            <br /> No signup required.
+            <br /> No signup required. Upload up to 3 files (20MB each, 30MB
+            total).
           </p>
         </div>
 

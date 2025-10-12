@@ -37,16 +37,36 @@ export async function sendTrash(data: {
       throw new Error("files are required for file type");
     }
 
-    // Encrypt each file
+    // Check file size limits before processing
     for (const file of data.files) {
-      const encrypted = await encryptFile(file, passcode);
-      encryptedFiles.push({
-        encryptedContent: encrypted.encryptedContent,
-        meta: encrypted.meta,
-      });
+      if (file.size > 20 * 1024 * 1024) {
+        throw new Error(
+          `File "${file.name}" is too large. Maximum size is 20MB per file.`
+        );
+      }
+    }
+
+    const totalSize = data.files.reduce((acc, file) => acc + file.size, 0);
+    if (totalSize > 30 * 1024 * 1024) {
+      throw new Error("Total file size cannot exceed 30MB.");
+    }
+
+    // Encrypt each file with error handling
+    for (const file of data.files) {
+      try {
+        const encrypted = await encryptFile(file, passcode);
+        encryptedFiles.push({
+          encryptedContent: encrypted.encryptedContent,
+          meta: encrypted.meta,
+        });
+      } catch (error) {
+        console.error(`Failed to encrypt file ${file.name}:`, error);
+        throw new Error(
+          `Failed to encrypt file "${file.name}". File may be too large or corrupted.`
+        );
+      }
     }
   }
-
   const passcodeHash = await hashPasscode(passcode);
   console.log("Passcode Hash:", passcodeHash);
   console.log("pass", passcode);
