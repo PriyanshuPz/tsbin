@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { VersioningType } from '@nestjs/common';
+import { json } from 'express';
+import { AllExceptionsFilter } from './lib/exception-filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -9,9 +11,6 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
       'https://tsbin.tech',
       'https://www.tsbin.tech',
     ],
@@ -24,12 +23,18 @@ async function bootstrap() {
     ],
     credentials: true,
   });
+  app.use(
+    json({
+      limit: '50mb',
+    }),
+  );
 
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',
   });
 
+  app.useGlobalFilters(new AllExceptionsFilter());
   await app.listen(process.env.PORT ?? 8000);
 }
 bootstrap();

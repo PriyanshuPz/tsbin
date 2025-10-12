@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { getTrash, decryptTrashContent } from "../lib/apis";
+import { getTrash, decryptTrashContent, decryptTrashFile } from "../lib/apis";
 
 interface TrashData {
   id: string;
@@ -14,12 +14,24 @@ interface TrashData {
   expires_at: string | null;
   size: number;
   created_at: string;
+  encryptedFiles?: Array<{
+    meta: {
+      iv: string;
+      algorithm: string;
+      fileName: string;
+      fileSize: number;
+      fileType: string;
+    };
+    messageId: string;
+    encryptedContent?: string;
+  }>;
 }
 
 export default function TrashView() {
   const { id } = useParams<{ id: string }>();
   const [trashData, setTrashData] = useState<TrashData | null>(null);
   const [decryptedContent, setDecryptedContent] = useState<string>("");
+  const [decryptedFiles, setDecryptedFiles] = useState<File[]>([]);
   const [passcode, setPasscode] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
@@ -40,16 +52,21 @@ export default function TrashView() {
       if (response.success) {
         setTrashData(response.data);
         if (!response.data.encrypted) {
-          const decryptedContent = await decryptTrashContent(
-            response.data.content,
-            response.data.encryption_meta,
-            "0000"
-          );
+          if (response.data.type === "text") {
+            const decryptedContent = await decryptTrashContent(
+              response.data.content,
+              response.data.encryption_meta,
+              "0000"
+            );
 
-          if (decryptedContent.success) {
-            setDecryptedContent(decryptedContent.content || "");
-          } else {
-            setError(decryptedContent.error || "Failed to decrypt");
+            if (decryptedContent.success) {
+              setDecryptedContent(decryptedContent.content || "");
+            } else {
+              setError(decryptedContent.error || "Failed to decrypt");
+            }
+          } else if (response.data.type === "file") {
+            // Handle unencrypted files (though this should be rare)
+            await handleFileDecryption(response.data, "0000");
           }
         } else {
           setNeedsPasscode(true);
@@ -64,6 +81,32 @@ export default function TrashView() {
     }
   };
 
+  const handleFileDecryption = async (data: TrashData, passcode: string) => {
+    if (!data.encryptedFiles) return;
+
+    const decryptedFilesList: File[] = [];
+
+    for (const encryptedFile of data.encryptedFiles) {
+      if (encryptedFile.encryptedContent) {
+        try {
+          const result = await decryptTrashFile(
+            encryptedFile.encryptedContent,
+            encryptedFile.meta,
+            passcode
+          );
+
+          if (result.success && result.file) {
+            decryptedFilesList.push(result.file);
+          }
+        } catch (error) {
+          console.error("Failed to decrypt file:", error);
+        }
+      }
+    }
+
+    setDecryptedFiles(decryptedFilesList);
+  };
+
   const handleDecrypt = async () => {
     if (!trashData || !passcode) return;
 
@@ -71,17 +114,22 @@ export default function TrashView() {
     setError("");
 
     try {
-      const result = await decryptTrashContent(
-        trashData.content,
-        trashData.encryption_meta,
-        passcode
-      );
+      if (trashData.type === "text") {
+        const result = await decryptTrashContent(
+          trashData.content,
+          trashData.encryption_meta,
+          passcode
+        );
 
-      if (result.success) {
-        setDecryptedContent(result.content || "");
+        if (result.success) {
+          setDecryptedContent(result.content || "");
+          setNeedsPasscode(false);
+        } else {
+          setError(result.error || "Failed to decrypt");
+        }
+      } else if (trashData.type === "file") {
+        await handleFileDecryption(trashData, passcode);
         setNeedsPasscode(false);
-      } else {
-        setError(result.error || "Failed to decrypt");
       }
     } catch (err) {
       setError("Invalid passcode or corrupted data");
@@ -114,6 +162,87 @@ export default function TrashView() {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const downloadFile = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Downloaded ${file.name}`);
+  };
+
+  const isImageFile = (file: File) => {
+    return file.type.startsWith("image/");
+  };
+
+  const FileDisplay = ({ file }: { file: File }) => {
+    const [imageUrl, setImageUrl] = useState<string>("");
+
+    useEffect(() => {
+      if (isImageFile(file)) {
+        const url = URL.createObjectURL(file);
+        setImageUrl(url);
+        return () => URL.revokeObjectURL(url);
+      }
+    }, [file]);
+
+    if (isImageFile(file)) {
+      return (
+        <div className="mb-4">
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-gray-800">{file.name}</h4>
+              <button
+                onClick={() => downloadFile(file)}
+                className="flex items-center space-x-2 px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200 text-sm"
+              >
+                <span>📥</span>
+                <span>Download</span>
+              </button>
+            </div>
+            <img
+              src={imageUrl}
+              alt={file.name}
+              className="max-w-full h-auto rounded-lg border border-gray-200"
+              style={{ maxHeight: "500px" }}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              {formatSize(file.size)} • {file.type}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="text-2xl">📄</div>
+              <div>
+                <h4 className="font-medium text-gray-800">{file.name}</h4>
+                <p className="text-sm text-gray-500">
+                  {formatSize(file.size)} • {file.type || "Unknown type"}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => downloadFile(file)}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200"
+            >
+              <span>📥</span>
+              <span>Download</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -205,11 +334,38 @@ export default function TrashView() {
             </div>
           ) : (
             <div className="p-8">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <pre className="whitespace-pre-wrap text-gray-800 text-base leading-relaxed font-mono">
-                  {decryptedContent}
-                </pre>
-              </div>
+              {trashData?.type === "text" ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <pre className="whitespace-pre-wrap text-gray-800 text-base leading-relaxed font-mono">
+                    {decryptedContent}
+                  </pre>
+                </div>
+              ) : trashData?.type === "file" ? (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">
+                    Files ({decryptedFiles.length})
+                  </h3>
+                  {decryptedFiles.length > 0 ? (
+                    decryptedFiles.map((file, index) => (
+                      <FileDisplay key={index} file={file} />
+                    ))
+                  ) : (
+                    <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+                      <div className="text-4xl mb-4">📁</div>
+                      <p className="text-gray-600">
+                        No files available to display
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <div className="text-center">
+                    <div className="text-4xl mb-4">❓</div>
+                    <p className="text-gray-600">Unknown content type</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

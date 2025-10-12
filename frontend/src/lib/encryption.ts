@@ -83,3 +83,56 @@ export async function decryptText(
 
   return new TextDecoder().decode(decryptedBuffer);
 }
+
+// File encryption utilities
+export async function encryptFile(file: File, passcode: string) {
+  const key = await deriveKey(passcode);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+  // Read file as ArrayBuffer
+  const fileBuffer = await file.arrayBuffer();
+
+  // Encrypt the file content
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    fileBuffer
+  );
+
+  return {
+    encryptedContent: ab2b64(encryptedBuffer),
+    meta: {
+      iv: ab2b64(iv.buffer),
+      algorithm: "AES-GCM",
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+    },
+  };
+}
+
+export async function decryptFile(
+  encryptedContent: string,
+  meta: {
+    iv: string;
+    algorithm: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+  },
+  passcode: string
+) {
+  const key = await deriveKey(passcode);
+  const iv = b642ab(meta.iv);
+  const encryptedBuffer = b642ab(encryptedContent);
+
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encryptedBuffer
+  );
+
+  // Create a blob with the decrypted content and original file type
+  const blob = new Blob([decryptedBuffer], { type: meta.fileType });
+  return new File([blob], meta.fileName, { type: meta.fileType });
+}

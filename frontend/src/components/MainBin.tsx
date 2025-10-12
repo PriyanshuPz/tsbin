@@ -81,6 +81,32 @@ export default function MainBin({}: MainBinProps) {
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
 
+    // support up to 5 files
+    if (selectedFiles.length + files.length > 5) {
+      toast.error("You can upload up to 5 files at a time.");
+      return;
+    }
+
+    // support up to 50MB total
+    const totalSize =
+      selectedFiles.reduce((acc, f) => acc + f.file.size, 0) +
+      Array.from(files).reduce((acc, f) => acc + f.size, 0);
+    if (totalSize > 50 * 1024 * 1024) {
+      toast.error("Total file size cannot exceed 50MB.");
+      return;
+    }
+
+    // support extensions: images, and text for now
+    for (const file of files) {
+      const fileType = getFileType(file);
+      if (!["image", "text", "video", "audio", "other"].includes(fileType)) {
+        toast.error(
+          `File type not supported: ${file.name}. Only images, text, video, audio, and other files are allowed.`
+        );
+        return;
+      }
+    }
+
     const newFiles = Array.from(files).map(createFilePreview);
     setSelectedFiles((prev) => [...prev, ...newFiles]);
   };

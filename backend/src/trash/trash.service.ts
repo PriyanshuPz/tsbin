@@ -2,20 +2,55 @@ import { HttpException, Injectable } from '@nestjs/common';
 import { CreateTrashDto } from './dto/create-trash.dto';
 import { UpdateTrashDto } from './dto/update-trash.dto';
 import { AppwriteService } from 'src/appwrite/appwrite.service';
+import { TelegramService } from 'src/telegram/telegram.service';
 import { generateId } from 'src/lib/utils';
 
 @Injectable()
 export class TrashService {
-  constructor(private readonly appwriteService: AppwriteService) {}
+  constructor(
+    private readonly appwriteService: AppwriteService,
+    private readonly telegramService: TelegramService,
+  ) {}
 
   async create(createTrashDto: CreateTrashDto) {
-    const { type, encryptedContent, meta, passcodeHash, expireAt } =
-      createTrashDto;
+    const {
+      type,
+      encryptedContent,
+      encryptedFiles,
+      meta,
+      passcodeHash,
+      expireAt,
+    } = createTrashDto;
 
-    if (type !== 'text') {
-      throw new Error('Only text type is supported for now.');
+    if (type === 'text') {
+      return this.createTextTrash({
+        encryptedContent,
+        meta,
+        passcodeHash,
+        expireAt,
+      });
+    } else if (type === 'file') {
+      return this.createFileTrash({
+        encryptedFiles,
+        passcodeHash,
+        expireAt,
+      });
+    } else {
+      throw new Error('Unsupported trash type');
     }
+  }
 
+  private async createTextTrash({
+    encryptedContent,
+    meta,
+    passcodeHash,
+    expireAt,
+  }: {
+    encryptedContent?: string;
+    meta?: any;
+    passcodeHash: string;
+    expireAt?: Date;
+  }) {
     if (!encryptedContent || !meta || !passcodeHash) {
       throw new Error(
         'Missing required fields: encryptedContent, meta, passcodeHash',
@@ -25,7 +60,7 @@ export class TrashService {
     const slug = generateId('ts');
 
     const data = {
-      type,
+      type: 'text',
       content: encryptedContent,
       encryption_meta: JSON.stringify(meta),
       passcode_hash: passcodeHash,
@@ -34,6 +69,8 @@ export class TrashService {
       views: 0,
       expires_at: expireAt || null,
       size: encryptedContent.length,
+      message_ids: '', // Not used for text
+      chat_id: '', // Not used for text
     };
 
     try {
@@ -45,7 +82,92 @@ export class TrashService {
       });
       return rec.slug;
     } catch (error) {
-      throw new HttpException('Failed to create trash', 500);
+      throw new HttpException('Failed to create text trash', 500);
+    }
+  }
+
+  private async createFileTrash({
+    encryptedFiles,
+    passcodeHash,
+    expireAt,
+  }: {
+    encryptedFiles?: Array<{
+      encryptedContent: string;
+      meta: any;
+    }>;
+    passcodeHash: string;
+    expireAt?: Date;
+  }) {
+    if (!encryptedFiles || encryptedFiles.length === 0) {
+      throw new Error('encryptedFiles is required for file type');
+    }
+
+    const slug = generateId('ts');
+    const fileMetadata: Array<{
+      message_id: number;
+      file_id: string;
+      meta: any;
+      originalSize: number;
+    }> = [];
+    let totalSize = 0;
+
+    try {
+      // Upload each encrypted file to Telegram
+      for (const encryptedFile of encryptedFiles) {
+        const { encryptedContent, meta } = encryptedFile;
+
+        // Convert base64 encrypted content back to buffer for Telegram
+        const fileBuffer = Buffer.from(encryptedContent, 'base64');
+        totalSize += fileBuffer.length;
+
+        // Upload to Telegram with original filename
+        const uploadResult = await this.telegramService.uploadFile(
+          fileBuffer,
+          meta.fileName,
+          `Encrypted file: ${meta.fileName} (Size: ${meta.fileSize} bytes)`,
+        );
+
+        fileMetadata.push({
+          message_id: uploadResult.message_id,
+          file_id: uploadResult.file_id,
+          meta: meta,
+          originalSize: meta.fileSize,
+        });
+      }
+
+      console.log('All files uploaded to Telegram:', fileMetadata);
+
+      // Store file metadata in database
+      const data = {
+        type: 'file',
+        content: JSON.stringify({
+          files: fileMetadata,
+        }),
+        encryption_meta: JSON.stringify({
+          algorithm: 'AES-GCM',
+          fileCount: encryptedFiles.length,
+        }),
+        passcode_hash: passcodeHash,
+        encrypted: passcodeHash !== '0000',
+        slug,
+        views: 0,
+        expires_at: expireAt || null,
+        size: totalSize,
+        message_ids: fileMetadata.map((f) => f.message_id),
+        chat_id: '',
+      };
+
+      const rec = await this.appwriteService.getDb().createRow({
+        rowId: slug,
+        data: data,
+        databaseId: this.appwriteService.getDatabaseId(),
+        tableId: 'trash',
+      });
+
+      return rec.slug;
+    } catch (error) {
+      console.error('File upload error:', error);
+      throw new HttpException('Failed to upload files', 500);
     }
   }
 
@@ -75,7 +197,7 @@ export class TrashService {
         throw new HttpException('Trash has expired', 410);
       }
 
-      return {
+      const result = {
         id: trash.$id,
         slug: trash.slug,
         type: trash.type,
@@ -90,6 +212,48 @@ export class TrashService {
         size: trash.size,
         created_at: trash.$createdAt,
       };
+
+      // If it's a file type, fetch the encrypted files from Telegram
+      if (trash.type === 'file' && trash.content) {
+        const fileData = JSON.parse(trash.content);
+        const encryptedFiles: any[] = [];
+
+        if (fileData.files && Array.isArray(fileData.files)) {
+          for (const fileInfo of fileData.files) {
+            try {
+              // Download the encrypted file content from Telegram using file_id
+              const encryptedFileBuffer = await this.telegramService.getFile(
+                fileInfo.file_id,
+              );
+
+              // Convert buffer to base64 string
+              const encryptedContent = encryptedFileBuffer.toString('base64');
+
+              encryptedFiles.push({
+                meta: fileInfo.meta,
+                messageId: fileInfo.message_id,
+                encryptedContent: encryptedContent,
+              });
+            } catch (error) {
+              console.error(
+                `Failed to fetch file for message ${fileInfo.message_id}:`,
+                error,
+              );
+              // Still add the file info without content so frontend knows it exists
+              encryptedFiles.push({
+                meta: fileInfo.meta,
+                messageId: fileInfo.message_id,
+                encryptedContent: null,
+                error: 'Failed to fetch file content',
+              });
+            }
+          }
+        }
+
+        result['encryptedFiles'] = encryptedFiles;
+      }
+
+      return result;
     } catch (error) {
       console.error(error);
       throw new HttpException('Failed to retrieve trash', 500);

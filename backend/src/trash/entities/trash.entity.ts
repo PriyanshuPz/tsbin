@@ -1,12 +1,12 @@
-export type TrashType = 'text' | 'image' | 'video' | 'audio' | 'document';
+export type TrashType = 'text' | 'file';
 
 export class Trash {
-  message_ids: string;
+  message_ids: string; // For files, this can store multiple message IDs as JSON
   type: TrashType;
   chat_id: string;
-  content?: string;
+  content?: string; // For text content or file metadata
   encrypted: boolean;
-  encryption_meta: string;
+  encryption_meta: string; // JSON string containing encryption metadata
   size: number;
   slug: string;
   views: number;

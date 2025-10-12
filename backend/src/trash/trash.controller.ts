@@ -20,21 +20,12 @@ export class TrashController {
   @Post()
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute for trash creation
   async create(@Body() createTrashDto: CreateTrashDto): Promise<Base> {
-    try {
-      const trashId = await this.trashService.create(createTrashDto);
-
-      return {
-        success: true,
-        data: trashId,
-        message: 'Trash created successfully',
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
-    }
+    const trashId = await this.trashService.create(createTrashDto);
+    return {
+      success: true,
+      data: trashId,
+      message: 'Trash created successfully',
+    };
   }
 
   @Get()

@@ -1,5 +1,11 @@
 import { SITE_CONFIG } from "./constants";
-import { encryptText, hashPasscode, decryptText } from "./encryption";
+import {
+  encryptText,
+  hashPasscode,
+  decryptText,
+  encryptFile,
+  decryptFile,
+} from "./encryption";
 
 export async function sendTrash(data: {
   type: "text" | "file";
@@ -12,6 +18,10 @@ export async function sendTrash(data: {
 
   let encryptedContent: string | undefined = undefined;
   let meta: any = undefined;
+  let encryptedFiles: Array<{
+    encryptedContent: string;
+    meta: any;
+  }> = [];
 
   if (data.type === "text") {
     if (!data.textContent) {
@@ -20,6 +30,21 @@ export async function sendTrash(data: {
     const encrypted = await encryptText(data.textContent, passcode);
     encryptedContent = encrypted.encryptedContent;
     meta = encrypted.meta;
+  }
+
+  if (data.type === "file") {
+    if (!data.files || data.files.length === 0) {
+      throw new Error("files are required for file type");
+    }
+
+    // Encrypt each file
+    for (const file of data.files) {
+      const encrypted = await encryptFile(file, passcode);
+      encryptedFiles.push({
+        encryptedContent: encrypted.encryptedContent,
+        meta: encrypted.meta,
+      });
+    }
   }
 
   const passcodeHash = await hashPasscode(passcode);
@@ -36,9 +61,8 @@ export async function sendTrash(data: {
     payload.meta = meta;
   }
 
-  // For files, we will handle encrypted chunks later
   if (data.type === "file") {
-    payload.files = data.files || [];
+    payload.encryptedFiles = encryptedFiles;
   }
 
   const response = await fetch(`${SITE_CONFIG.API_URL}/trash`, {
@@ -100,6 +124,19 @@ export async function decryptTrashContent(
   try {
     const decryptedText = await decryptText(encryptedContent, meta, passcode);
     return { success: true, content: decryptedText };
+  } catch (error) {
+    return { success: false, error: "Invalid passcode or corrupted data" };
+  }
+}
+
+export async function decryptTrashFile(
+  encryptedContent: string,
+  meta: any,
+  passcode: string
+) {
+  try {
+    const decryptedFile = await decryptFile(encryptedContent, meta, passcode);
+    return { success: true, file: decryptedFile };
   } catch (error) {
     return { success: false, error: "Invalid passcode or corrupted data" };
   }

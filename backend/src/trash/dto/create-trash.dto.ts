@@ -6,13 +6,21 @@ export class CreateTrashDto {
   // For text-based trash
   encryptedContent?: string;
 
-  // For files (array of encrypted chunks)
-  encryptedChunks?: string[];
+  // For files - array of encrypted file objects
+  encryptedFiles?: Array<{
+    encryptedContent: string;
+    meta: {
+      iv: string;
+      algorithm: string;
+      fileName: string;
+      fileSize: number;
+      fileType: string;
+    };
+  }>;
 
-  // Metadata from client-side encryption
-  meta: {
+  // Metadata from client-side encryption (for text)
+  meta?: {
     iv: string;
-    salt: string;
     algorithm: string;
   };
 
@@ -20,7 +28,5 @@ export class CreateTrashDto {
   passcodeHash: string;
 
   // Optional metadata
-  fileName?: string;
-  fileSize?: number;
   expireAt?: Date;
 }
