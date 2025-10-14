@@ -85,9 +85,47 @@ bun run dev
 bun run dev
 ```
 
-5. **Optional CLI setup (soon)**
+5. **CLI Setup and Usage**
 
-- CLI is a separate module; refer to `packages/cli` for instructions.
+The CLI (Command-Line Interface) allows users to interact with tsbin directly from the terminal,for instance,to upload,encrypt or manage files without using the web UI.
+
+**Location**
+
+The CLI source code is located in the `/packages/cli` directory.
+
+**🛠️Setup Steps**
+
+Navigate to the CLI folder:
+
+```bash
+cd packages/cli
+```
+
+Install dependencies:
+
+```bash
+bun install
+```
+
+Run the CLI in development mode:
+
+```bash
+bun run dev
+```
+
+Build for production:
+
+```bash
+bun run build
+```
+
+**Contributing to the CLI**
+
+- Follow the TypeScript conventions as the main project.
+
+- Test your changes locally using sample commands(eg:bun run tsbin <command>).
+
+- Update CLI usage examples in documentation if you add or modify commands.
 
 ---
 
