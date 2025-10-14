@@ -7,6 +7,17 @@ This document will help you get started and explain our guidelines for contribut
 
 ---
 
+## 🧩 **Before You Begin**
+
+- Make sure Node.js ≥ 18 and Bun ≥ 1.0 are installed
+- Read the README.md first
+- Familiarize yourself with project structure:
+  /frontend → React app
+  /backend → API & server
+  /packages/cli → optional CLI
+
+---
+
 ## **Table of Contents**
 
 1. [Code of Conduct](#code-of-conduct)
@@ -138,6 +149,24 @@ git push origin feature/my-feature
 
 - tsbin is a collaborative, **open-source project**. Everyone is welcome to contribute.
 - For larger features or breaking changes, open an **issue first** to discuss the design.
+
+---
+
+### ✅ **Pre-PR Checklist**
+
+- [ ] Tested changes locally
+- [ ] Updated documentation if needed
+- [ ] Followed linting/formatting rules
+- [ ] Linked the related issue
+
+---
+
+## 📚 **Resources for Beginners**
+
+- [GitHub Flow Guide](https://guides.github.com/introduction/flow/)
+- [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+- [Markdown Cheat Sheet](https://www.markdownguide.org/cheat-sheet/)
+- [Open Source Guide](https://opensource.guide/how-to-contribute/)
 
 ---
 
