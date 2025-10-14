@@ -1,58 +1,115 @@
+// src/snippet.js
+/*
+  uses the api upload because the api route for createTextTrash fails on this line
+  try {
+      const rec = await this.appwriteService.getDb().createRow({
+        rowId: slug,
+        data: data,
+        databaseId: this.appwriteService.getDatabaseId(),
+        tableId: 'trash',
+      });
+      return rec.slug;
+    } catch (error) {
+      throw new HttpException('Failed to create text trash', 500);
+    }
+  https://api.tsbin.tech/v1/trash
+  maybe the api route not in prod that's why
+
+  the code tackling this issue is given below is given with a quick hack is used otherwise in comments.
+  the hack will work 100%
+
+*/
+
+/* HACK
+import fs from "fs";
+import path from "path";
+import { uploadFile } from "./upload.js";
+
+export async function sendSnippet(text, passcode) {
+  console.log("🔐 Encrypting snippet...");
+  const tempPath = path.join("cli", "temp", `snippet-${Date.now()}.txt`);
+
+  // ensure temp dir
+  fs.mkdirSync(path.dirname(tempPath), { recursive: true });
+  fs.writeFileSync(tempPath, text);
+
+  await uploadFile(tempPath, passcode);
+  const tempDir = path.join("cli", "temp");
+
+  if (fs.existsSync(tempDir)) {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+*/
+
+
+import fs from "fs";
+import path from "path";
 import crypto from "crypto";
 import axios from "axios";
+import chalk from "chalk";
 import dotenv from "dotenv";
 dotenv.config();
 
-const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } = process.env;
+/**
+ * Encrypts text using AES-GCM with a passcode.
+ */
+function encryptText(text, passcode) {
+  const iv = crypto.randomBytes(12);
+  const salt = crypto.randomBytes(16);
+  const key = crypto.pbkdf2Sync(passcode, salt, 100000, 32, "sha256");
 
-export async function sendSnippet(text, passcode) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error("❌ TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing in .env");
-    process.exit(1);
-  }
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  let encrypted = cipher.update(text, "utf8", "base64");
+  encrypted += cipher.final("base64");
 
-  console.log("🔐 Encrypting snippet...");
+  const authTag = cipher.getAuthTag().toString("base64");
 
-  // --- AES-256-CBC encryption ---
-  const iv = crypto.randomBytes(16);
-  const key = crypto.createHash("sha256").update(passcode).digest();
-  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-
-  let encrypted = cipher.update(text, "utf8");
-  encrypted = Buffer.concat([encrypted, cipher.final()]);
-
-  // Embed IV at the beginning of the encrypted payload
-  const payload = Buffer.concat([iv, encrypted]).toString("base64");
-
-  // --- Telegram message ---
-  const message = [
-    "📎 *Encrypted Snippet 🔒*",
-    "",
-    `🧩 *Data:* \`${payload}\``,
-    `🔑 *Passcode:* \`${passcode}\``,
-    "",
-    "👉 Decrypt using:",
-    `\`npx tsbin decrypt-snippet --data <above-data> --passcode ${passcode}\``,
-  ].join("\n");
-
-  console.log("📤 Sending encrypted snippet to Telegram...");
-
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  const body = {
-    chat_id: TELEGRAM_CHAT_ID,
-    text: message,
-    parse_mode: "Markdown",
+  return {
+    encryptedContent: encrypted,
+    meta: {
+      iv: iv.toString("base64"),
+      salt: salt.toString("base64"),
+      authTag,
+      algorithm: "AES-GCM",
+    },
   };
+}
 
+/**
+ * Create an encrypted snippet and upload it to the API
+ */
+export async function sendSnippet(text, passcode) {
   try {
-    const response = await axios.post(url, body);
+    console.log(chalk.cyan("🔐 Encrypting snippet..."));
+    const { encryptedContent, meta } = encryptText(text, passcode);
 
-    if (response.data.ok) {
-      console.log("✅ Snippet sent successfully!");
+    console.log(chalk.cyan("📤 Uploading snippet to tsbin API..."));
+
+    const response = await axios.post("https://api.tsbin.tech/v1/trash", {
+      type: "text",
+      encryptedContent,
+      meta,
+      passcodeHash: passcode,
+      expireAt: null,
+    });
+
+    if (response.data.success) {
+      const fileName = `snippet-${Date.now()}.txt`;
+      const savePath = path.join("cli", "downloads", fileName);
+
+      fs.writeFileSync(savePath, text, "utf8");
+      console.log(chalk.green("✅ Snippet uploaded successfully!"));
+      console.log(chalk.yellow(`📝 Saved a local copy as: ${savePath}`));
+      console.log(chalk.cyan(`🔗 Share ID: ${response.data.data?.slug || "N/A"}`));
     } else {
-      console.error("❌ Failed to send snippet:", response.data);
+      console.error(chalk.red("❌ Failed to create snippet:"), response.data);
     }
-  } catch (err) {
-    console.error("❌ Telegram API error:", err.message);
+  } catch (error) {
+    console.error(
+      chalk.red("❌ Error uploading snippet:"),
+      error.response?.data || error.message
+    );
   }
 }
+
