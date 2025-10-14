@@ -13,6 +13,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'https://tsbin.tech',
       'https://www.tsbin.tech',
+      'https://api.tsbin.tech',
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
