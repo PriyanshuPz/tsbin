@@ -1,29 +1,56 @@
 // src/upload.js
-import path from "path";
 import fs from "fs";
-import { encryptFile } from "./crypto.js";
-import { telegramUpload } from "./telegramUpload.js";
+import crypto from "crypto";
+import axios from "axios";
+import { encryptFile } from "../utils/encryptFile.js";
 
 export async function uploadFile(filePath, passcode) {
-  const fileName = path.basename(filePath);
-  const tmpEnc = path.join("./", `${fileName}.tsbin.enc`);
-
   try {
-    console.log(`🔐 Encrypting ${fileName}...`);
-    const ivHex = await encryptFile(filePath, tmpEnc, passcode);
+    if (!fs.existsSync(filePath)) {
+      console.error("❌ File not found:", filePath);
+      return;
+    }
 
-    console.log("📤 Uploading to Telegram...");
-    const fileId = await telegramUpload(tmpEnc);
+    const fileName = filePath.split(/[\\/]/).pop();
+    const fileSize = fs.statSync(filePath).size;
 
-    // remove local encrypted temporary
-    fs.unlinkSync(tmpEnc);
-    console.log("✅ Uploaded successfully!");
-    console.log(`📎 File ID: ${fileId}`);
-    // optional: print iv for user reference (not required)
-    console.log(`🧩 IV (hex, for debugging only): ${ivHex}`);
-    return { fileId, iv: ivHex };
-  } catch (err) {
-    if (fs.existsSync(tmpEnc)) try { fs.unlinkSync(tmpEnc); } catch {}
-    throw err;
+    console.log("🔐 Encrypting file...");
+    const encryptedBuffer = encryptFile(filePath, passcode); // returns Buffer
+    const tempEnc = `${filePath}.enc`;
+    fs.writeFileSync(tempEnc, encryptedBuffer); // write to disk
+
+    const ivHex = encryptedBuffer.slice(0, 16).toString("hex"); // extract IV from start
+    const encryptedContentBase64 = encryptedBuffer.toString("base64");
+    const passcodeHash = crypto.createHash("sha256").update(passcode).digest("hex");
+
+    const payload = {
+      type: "file",
+      encryptedFiles: [
+        {
+          encryptedContent: encryptedContentBase64,
+          meta: { fileName, fileSize, iv: ivHex },
+        },
+      ],
+      passcodeHash,
+      expireAt: null,
+    };
+
+    console.log("📤 Uploading to tsbin API...");
+    const response = await axios.post("https://api.tsbin.tech/v1/trash", payload, {
+      headers: { "Content-Type": "application/json" },
+      maxBodyLength: Infinity,
+    });
+
+    if (response.data.success) {
+      console.log("✅ Upload successful!");
+      console.log("🧾 Response:", response.data);
+    } else {
+      console.error("⚠️ Upload failed:", response.data);
+    }
+
+    // clean up temp encrypted file
+    fs.unlinkSync(tempEnc);
+  } catch (error) {
+    console.error("❌ Upload error:", error.response?.data || error.message);
   }
 }

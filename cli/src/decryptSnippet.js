@@ -1,3 +1,12 @@
+/*
+Cuurently of no use but if snippet route added in https://api.tsbin.tech/v1/trash 
+then can be used for
+Decrypt base64 snippet text (if ever used directly) — so kept
+
+*/
+
+
+
 import crypto from "crypto";
 
 /**

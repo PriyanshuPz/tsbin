@@ -15,28 +15,49 @@ program
   .description("Temporary, encrypted file-sharing CLI")
   .version("0.1.0");
 
+// program
+//   .command("upload")
+//   .argument("<path>", "file path to upload")
+//   .option("--passcode <passcode>", "encryption passcode", "1234")
+//   .action(async (filePath, options) => {
+//     await uploadFile(filePath, options.passcode);
+//   });
+
+// program
+//   .command("download")
+//   .argument("<file-id>", "Telegram file ID")
+//   .requiredOption("--passcode <passcode>", "Decryption passcode")
+//   .action(async (fileId, options) => {
+//     await downloadFile(fileId, options.passcode);
+//   });
+
+// program
+//   .command("snippet")
+//   .argument("<text>", "text snippet to encrypt")
+//   .option("--passcode <passcode>", "encryption passcode", "1234")
+//   .action(async (text, opts) => {
+//     await sendSnippet(text, opts.passcode);
+//   });
+
 program
-  .command("upload")
-  .argument("<path>", "file path to upload")
-  .option("--passcode <passcode>", "encryption passcode", "1234")
-  .action(async (filePath, options) => {
-    await uploadFile(filePath, options.passcode);
+  .command("upload <path>")
+  .option("--passcode <code>", "encryption passcode")
+  .action(async (path, options) => {
+    await uploadFile(path, options.passcode);
   });
 
 program
-  .command("download")
-  .argument("<file-id>", "Telegram file ID")
-  .requiredOption("--passcode <passcode>", "Decryption passcode")
-  .action(async (fileId, options) => {
-    await downloadFile(fileId, options.passcode);
+  .command("download <fileId>")
+  .option("--passcode <code>", "decryption passcode")
+  .action(async (id, options) => {
+    await downloadFile(id, options.passcode);
   });
 
 program
-  .command("snippet")
-  .argument("<text>", "text snippet to encrypt")
-  .option("--passcode <passcode>", "encryption passcode", "1234")
-  .action(async (text, opts) => {
-    await sendSnippet(text, opts.passcode);
+  .command("snippet <text>")
+  .option("--passcode <code>", "encryption passcode")
+  .action(async (text, options) => {
+    await sendSnippet(text, options.passcode);
   });
 
 program
