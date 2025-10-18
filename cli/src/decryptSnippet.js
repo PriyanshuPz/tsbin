@@ -1,39 +1,56 @@
-/*
-Cuurently of no use but if snippet route added in https://api.tsbin.tech/v1/trash 
-then can be used for
-Decrypt base64 snippet text (if ever used directly) — so kept
-
-*/
-
-
-
+// cli/src/decrypt-snippet.js
+import axios from "axios";
 import crypto from "crypto";
+import chalk from "chalk";
 
 /**
- * Decrypts AES-256-CBC encrypted snippet with embedded IV
+ * AES-GCM decryption
  */
-export async function decryptSnippet(dataBase64, passcode) {
+function decryptText(encryptedContent, meta, passcode) {
+  const iv = Buffer.from(meta.iv, "base64");
+  const salt = Buffer.from(meta.salt, "base64");
+  const authTag = Buffer.from(meta.authTag, "base64");
+
+  const key = crypto.pbkdf2Sync(passcode, salt, 100000, 32, "sha256");
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(authTag);
+
+  let decrypted = decipher.update(encryptedContent, "base64", "utf8");
+  decrypted += decipher.final("utf8");
+  return decrypted;
+}
+
+/**
+ * Fetch snippet from API and decrypt
+ */
+export async function decryptSnippet(id, passcode) {
+  console.log(chalk.cyan("Fetching snippet data..."));
+
   try {
-    console.log("🔓 Decrypting snippet...");
+    const res = await axios.get(`https://api.tsbin.tech/v1/trash/${id}`);
+    const data = res.data.data || res.data; // handle both formats
 
-    const data = Buffer.from(dataBase64, "base64");
+    if (!data || !data.content) {
+      throw new Error("No content found for this snippet ID.");
+    }
 
-    if (data.length <= 16) throw new Error("Invalid data: too short");
+    const encryptedContent = data.content;
+    const meta =
+      typeof data.encryption_meta === "string"
+        ? JSON.parse(data.encryption_meta)
+        : data.encryption_meta;
 
-    const iv = data.subarray(0, 16);
-    const encrypted = data.subarray(16);
+    console.log(chalk.cyan("Decrypting snippet..."));
+    const decrypted = decryptText(encryptedContent, meta, passcode);
 
-    const key = crypto.createHash("sha256").update(passcode).digest();
-    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
-
-    let decrypted = decipher.update(encrypted, undefined, "utf8");
-    decrypted += decipher.final("utf8");
-
-    console.log("\n✅ Decrypted snippet:");
-    console.log("───────────────────────────────");
+    console.log(chalk.green("Decryption successful!"));
+    console.log(chalk.yellow("\nDecrypted Snippet:\n───────────────────────────────"));
     console.log(decrypted);
     console.log("───────────────────────────────");
-  } catch (err) {
-    console.error("❌ Failed to decrypt snippet:", err.message);
+  } catch (error) {
+    console.error(
+      chalk.red("Failed to decrypt snippet:"),
+      error.response?.data?.message || error.message
+    );
   }
 }

@@ -4,8 +4,9 @@ import { uploadFile } from "../src/upload.js";
 import { downloadFile } from "../src/download.js";
 import { sendSnippet } from "../src/snippet.js";
 import { decryptSnippet } from "../src/decryptSnippet.js";
-
+import chalk from "chalk";
 import dotenv from "dotenv";
+import axios from "axios";
 dotenv.config();
 
 const program = new Command();
@@ -69,21 +70,6 @@ program
     await decryptSnippet(opts.data, opts.passcode);
   });
 
-  /**
- * DECRYPT SNIPPET
- */
-program
-  .command("decrypt-snippet")
-  .requiredOption("--data <data>", "Base64 encoded snippet data")
-  .requiredOption("--passcode <passcode>", "Decryption passcode")
-  .description("Decrypt an encrypted snippet with the given passcode")
-  .action(async (opts) => {
-    await decryptSnippet(opts.data, opts.passcode);
-  });
-
-/**
- * LIST ALL TRASH ITEMS (GET /v1/trash)
- */
 program
   .command("list")
   .description("List all available trash items from the API")
