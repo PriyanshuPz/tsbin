@@ -22,25 +22,25 @@ function decryptBuffer(encryptedBuffer, passcode) {
  */
 export async function downloadFile(fileId, passcode) {
   try {
-    console.log("📥 Fetching from tsbin API...");
+    console.log("Fetching from tsbin API...");
     const res = await axios.get(`https://api.tsbin.tech/v1/trash/${fileId}`);
 
     const trash = res.data?.data;
     if (!trash) {
-      console.error("❌ No data returned from API.");
+      console.error("No data returned from API.");
       return;
     }
 
-    // ✅ The API may store files in `trash.encryptedFiles[0].encryptedContent`
+    // The API may store files in `trash.encryptedFiles[0].encryptedContent`
     const encFile = trash.encryptedFiles?.[0];
     if (!encFile?.encryptedContent) {
-      console.error("❌ No encrypted content found.");
+      console.error("No encrypted content found.");
       return;
     }
 
     const encryptedBuffer = Buffer.from(encFile.encryptedContent, "base64");
 
-    console.log("🔓 Decrypting file...");
+    console.log("Decrypting file...");
     const decrypted = decryptBuffer(encryptedBuffer, passcode);
 
     // Save to downloads directory
@@ -51,8 +51,8 @@ export async function downloadFile(fileId, passcode) {
     const savePath = path.join(saveDir, fileName);
     fs.writeFileSync(savePath, decrypted);
 
-    console.log(`✅ Download complete! Saved to ${savePath}`);
+    console.log(`Download complete! Saved to ${savePath}`);
   } catch (err) {
-    console.error("❌ Download error:", err.response?.data || err.message);
+    console.error("Download error:", err.response?.data || err.message);
   }
 }

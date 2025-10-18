@@ -14,7 +14,7 @@ import crypto from "crypto";
  */
 export async function decryptSnippet(dataBase64, passcode) {
   try {
-    console.log("🔓 Decrypting snippet...");
+    console.log("Decrypting snippet...");
 
     const data = Buffer.from(dataBase64, "base64");
 
@@ -29,11 +29,11 @@ export async function decryptSnippet(dataBase64, passcode) {
     let decrypted = decipher.update(encrypted, undefined, "utf8");
     decrypted += decipher.final("utf8");
 
-    console.log("\n✅ Decrypted snippet:");
+    console.log("\nDecrypted snippet:");
     console.log("───────────────────────────────");
     console.log(decrypted);
     console.log("───────────────────────────────");
   } catch (err) {
-    console.error("❌ Failed to decrypt snippet:", err.message);
+    console.error("Failed to decrypt snippet:", err.message);
   }
 }

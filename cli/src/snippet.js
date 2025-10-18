@@ -7,11 +7,11 @@ const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } = process.env;
 
 export async function sendSnippet(text, passcode) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error("❌ TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing in .env");
+    console.error("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing in .env");
     process.exit(1);
   }
 
-  console.log("🔐 Encrypting snippet...");
+  console.log("Encrypting snippet...");
 
   // --- AES-256-CBC encryption ---
   const iv = crypto.randomBytes(16);
@@ -26,16 +26,16 @@ export async function sendSnippet(text, passcode) {
 
   // --- Telegram message ---
   const message = [
-    "📎 *Encrypted Snippet 🔒*",
+    " *Encrypted Snippet*",
     "",
-    `🧩 *Data:* \`${payload}\``,
-    `🔑 *Passcode:* \`${passcode}\``,
+    `*Data:* \`${payload}\``,
+    `*Passcode:* \`${passcode}\``,
     "",
-    "👉 Decrypt using:",
+    "Decrypt using:",
     `\`npx tsbin decrypt-snippet --data <above-data> --passcode ${passcode}\``,
   ].join("\n");
 
-  console.log("📤 Sending encrypted snippet to Telegram...");
+  console.log("Sending encrypted snippet to Telegram...");
 
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const body = {
@@ -48,11 +48,11 @@ export async function sendSnippet(text, passcode) {
     const response = await axios.post(url, body);
 
     if (response.data.ok) {
-      console.log("✅ Snippet sent successfully!");
+      console.log("Snippet sent successfully!");
     } else {
-      console.error("❌ Failed to send snippet:", response.data);
+      console.error("Failed to send snippet:", response.data);
     }
   } catch (err) {
-    console.error("❌ Telegram API error:", err.message);
+    console.error("Telegram API error:", err.message);
   }
 }
