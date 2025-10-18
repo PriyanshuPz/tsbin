@@ -14,7 +14,7 @@ export async function uploadFile(filePath, passcode) {
     const fileName = filePath.split(/[\\/]/).pop();
     const fileSize = fs.statSync(filePath).size;
 
-    console.log(" Encrypting file...");
+    console.log("🔐 Encrypting file...");
     const encryptedBuffer = encryptFile(filePath, passcode); // returns Buffer
     const tempEnc = `${filePath}.enc`;
     fs.writeFileSync(tempEnc, encryptedBuffer); // write to disk

@@ -8,12 +8,13 @@ with **all encryption and decryption happening locally** using `AES-256-CBC`.
 
 ## ⚙️ Features
 
-- 🔐 **AES-256-CBC encryption (client-side only)**  
-- 📤 **Upload encrypted files to Telegram**  
-- 📥 **Download and decrypt using a passcode**  
-- 🧩 **Encrypt and share text snippets directly**  
-- 🧹 **No sensitive data stored locally**  
-- ❌ **Wrong passcode detection** — prevents corrupted output  
+- 🔐 AES-256 encryption (local only) — no plaintext ever leaves your system
+- 📤 Upload encrypted files/snippets to the tsbin API (https://api.tsbin.tech)
+- 📥 Download and decrypt files securely using a passcode
+- 🧩 Encrypt and share text snippets
+- 🧾 Supports both file and text modes
+- ❌ Passcode mismatch detection (ensures safe decryption)
+- 🧠 Simple CLI syntax with npx tsbin <command>
 
 ---
 
@@ -26,81 +27,44 @@ cli/
 ├── downloads/
 │   └── a.txt
 ├── src/
-│   ├── crypto.js
 │   ├── decryptSnippet.js
 │   ├── download.js
 │   ├── snippet.js
-│   ├── telegramDownload.js
-│   ├── telegramUpload.js
 │   └── upload.js
 ├── test/
-│   ├── a.txt
-│   └── sendMessage.js
+│   └── a.txt
 ├── utils/
 │   └── encryptFile.js
 ├── .env
 ├── .env.example
-├── .tsbin_meta.json
 ├── package-lock.json
 ├── package.json
-├── README.md
-└── snippet-1760282723291.enc
+└── README.md
 ```
 
 
 ---
 
-## 🤖 Creating a Telegram Bot (Setup Guide)
-
-If you don’t already have a Telegram bot and chat ID, follow these quick steps:
-
-### 🪄 Step 1: Create a Bot with BotFather
-
-- Open Telegram and search for @BotFather.
-
-- Type /start and then /newbot.
-
-- Choose a name and a unique username (e.g., tsbin_secure_bot).
-
-- BotFather will reply with:
-Done! Congratulations on your new bot.
-Use this token to access the HTTP API:
-1234567890:ABCDEF-Your-Bot-Token
-
-
-```Copy that token — this is your TELEGRAM_BOT_TOKEN.```
-
-## 📬 Step 2: Get Your Chat ID
-
-### To find your TELEGRAM_CHAT_ID:
-
-- Start a chat with your bot (send it any message, like “Hello”).
-
-- Open your browser and go to:
-https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
-
-
-- Look for something like:
-"chat": { "id": 987654321, "first_name": "John", ... }
-
-
-→ Use the "id" value (e.g., 987654321) as TELEGRAM_CHAT_ID.
-
 ## ⚡ Setup
 
-1. **Install dependencies**
+### Install dependencies
   ```bash
   npm install
   ```
-## .env File Example
+### Set up environment
+
+Create a .env file in your root directory:
 ```
-  TELEGRAM_BOT_TOKEN=<your-bot-token>
-  TELEGRAM_CHAT_ID=<your-chat-id>
+  API_BASE_URL=https://api.tsbin.tech
 ```
-## Make Executable
+### Make Executable
 Make the CLI entry point globally runnable (useful for development/testing):
 ```
 chmod +x ./bin/tsbin.js
+```
+### Run using NPX
+```
+npx tsbin <command>
 ```
 
 ---
@@ -110,24 +74,26 @@ All commands are executed via `npx tsbin <command>`.
 
 ### 🗂 Upload a File
 
-Encrypts the file locally and uploads the resulting `.enc` file to Telegram.
+Encrypts and uploads a file securely to the tsbin API.
 
 ```bash
 npx tsbin upload ./test/a.txt --passcode mySecret
 ```
 Output Example:
 
-```bash
-🔐 Encrypting a.txt...
-📤 Uploading to Telegram...
-✅ Uploaded successfully!
-📎 File ID: BQACAgUAAxkDAAMVaOvO-MrUEkAXeDsswHH-A-fJGsAAAocZAAK1w2FXL0_3MG_0v1o2BA
-🧩 IV (hex, for debugging only): 5af8b6c91f4e42b593ca3ef2
-
+```
+🔐 Encrypting file...
+📤 Uploading to tsbin API...
+✅ Upload successful!
+🧾 Response: {
+  success: true,
+  data: 'ts_QukIVdQc',
+  message: 'Trash created successfully'
+}
 ```
 ### 📥 Download and Decrypt
 
-Downloads the encrypted file using the <file-id> and decrypts it locally.
+Downloads and decrypts a previously uploaded file.
 
 ```bash
 npx tsbin download <file-id> --passcode mySecret
@@ -136,12 +102,9 @@ npx tsbin download <file-id> --passcode mySecret
 Output Example:
 
 ```bash
-📥 Downloading encrypted file...
-📥 File downloaded: downloads\file_1760284659172.enc
-🔓 Decrypting and restoring original filename...
-🧹 Removed temporary encrypted file: downloads\file_1760284659172.enc
-✅ Decrypted successfully: ./downloads/a.txt
-🧩 IV used (hex): 5af8b6c91f4e42b593ca3ef2
+📥 Fetching from tsbin API...
+🔓 Decrypting file...
+✅ Download complete! Saved to cli\downloads\a.txt
 ```
 
 If the passcode is incorrect:
@@ -150,9 +113,9 @@ If the passcode is incorrect:
 ```
 
 ## Encrypt & Share a Snippet
-Encrypts a text snippet and sends it as a Telegram message.
+Encrypts a plain text snippet and uploads it to the tsbin API.
 ```
-npx tsbin snippet "Hello World" --passcode 1234
+Encrypts a plain text snippet and uploads it to the tsbin API
 ```
 
 Output Example:
@@ -162,25 +125,54 @@ Output Example:
 
 ```bash
 🔐 Encrypting snippet...
-📤 Sending encrypted snippet to Telegram...
-✅ Snippet sent successfully!
+📤 Uploading encrypted snippet to tsbin API...
+✅ Snippet uploaded successfully!
+🔗 Share ID: ts_wgzxskJ5
+Use this to decrypt:
+npx tsbin decrypt-snippet --id ts_wgzxskJ5 --passcode mySecret123
 ```
 
-## 🔓 Decrypt a Snippet Locally
-Decrypts an encrypted snippet without needing Telegram.
+## 🔓 Decrypt a Snippet
+Fetches and decrypts a snippet uploaded via snippet.
 
 ```
-npx tsbin decrypt-snippet --data <encrypted-base64> --passcode 1234
+npx tsbin decrypt-snippet --data ts_wgzxskJ5 --passcode mySecret123
 ```
 
 Output:
 ```
+📡 Fetching snippet data...
 🔓 Decrypting snippet...
+✅ Decryption successful!
 
-✅ Decrypted snippet:
+📜 Decrypted Snippet:
 ───────────────────────────────
-<decrypted text>
+Hello World from TsBin!
 ───────────────────────────────
+```
+## 📋 List All Items (⚠️ API not implemented)
+```
+npx tsbin list
+```
+### Current Output:
+```
+📥 Fetching all items from tsbin API...
+📥 Fetching all items from tsbin API...
+❌ No items found or API returned empty data.
+```
+
+### 🔍 Get a Single Item
+Fetch detailed info about a specific item.
+```
+🔍 Fetching item: ts_QukIVdQc...
+✅ Item found:
+
+🆔 ID: ts_QukIVdQc
+📄 Type: file
+📏 Size: 80
+👀 Views: 7
+⏰ Expires: Never
+🔒 Encrypted: Yes
 ```
 
 ## 🔒 Encryption Flow
@@ -219,16 +211,46 @@ npx tsbin download <file-id> --passcode mySecret
 
  ⚠️ Notes
 
-- 📨 Telegram is used only as a temporary storage medium
+- 📨 tsbin uses https://api.tsbin.tech
+ as the backend for uploads
 
-- 🔐 All encryption/decryption is end-to-end and local
+- 🔐 All encryption/decryption is local (E2E)
 
-- ⚠️ Passcodes must match exactly
+- ⚠️ Passcodes must match exactly or decryption will fail
 
-- 💾 No IV, key, or filename metadata is stored permanently
+- 💾 No IV, key, or filename metadata is stored unencrypted
+
+- 🚧 Listing (list) and fetching (get) are partial — backend under development
 
 ## 🧑‍💻 Example .env File
 ```
-TELEGRAM_BOT_TOKEN=1234567890:ABCDEFyourtoken
-TELEGRAM_CHAT_ID=987654321
+API_BASE_URL=https://api.tsbin.tech
 ```
+
+### 🧱 Example Commands for Testing
+```
+# Upload
+npx tsbin upload ./test/a.txt --passcode mySecret
+
+# Download
+npx tsbin download ts_QukIVdQc --passcode mySecret
+
+# Encrypt Snippet
+npx tsbin snippet "Hello from TsBin" --passcode mySecret123
+
+# Decrypt Snippet
+npx tsbin decrypt-snippet --data ts_ABC12345 --passcode mySecret123
+
+# List all (stub)
+npx tsbin list
+
+# Get one (inspect JSON)
+npx tsbin get ts_ABC12345
+```
+### Tech Stack
+- Node.js (v18+)
+- Commander.js — for CLI handling
+- Axios — for API calls
+- Crypto — AES-256 encryption/decryption
+- dotenv — environment management
+- chalk — colorful terminal output
