@@ -1,160 +1,154 @@
-# 🗑️ tsbin (Trashbin) Command-Line Interface (CLI) Documentation
+# 🧰 tsbin — Temporary Encrypted File & Snippet Sharing CLI
 
-**tsbin** is a minimal, secure command-line tool for temporary, end-to-end encrypted file and text snippet sharing. It is designed to be a "digital trashbin" where shared content automatically expires.
+**tsbin** is a secure, temporary, encrypted file & text snippet sharing CLI tool.  
+It allows users to upload files or encrypted snippets to **Telegram** for fast and private sharing —  
+with **all encryption and decryption happening locally** using `AES-256-CBC`.
 
-## 🚀 1. Overview and Core Features
+---
 
-The `tsbin` CLI is the primary way to interact with the service. All encryption and decryption happen locally on your machine.
+## ⚙️ Features
 
-### Key Features
+- 🔐 AES-256 encryption (local only) — no plaintext ever leaves your system
+- 📤 Upload encrypted files/snippets to the tsbin API (https://api.tsbin.tech)
+- 📥 Download and decrypt files securely using a passcode
+- 🧩 Encrypt and share text snippets
+- 🧾 Supports both file and text modes
+- ❌ Passcode mismatch detection (ensures safe decryption)
+- 🧠 Simple CLI syntax with npx tsbin <command>
 
-  * **End-to-End Encryption (E2EE):** Files and snippets are encrypted locally before transmission and decrypted only upon download.
-  * **Simple Commands:** Focused on three main actions: `up` (upload), `down` (download), and `snip` (snippet).
-  * **Passcode Protection:** Optionally secure uploads with a passcode, which is required for decryption.
-  * **Decentralized Storage:** Files are stored on Telegram using a Bot, and metadata is managed via Appwrite.
+---
 
-## ⚙️ 2. Installation and Setup
-
-### Prerequisites
-
-To use `tsbin`, you must have:
-
-  * **Node.js** (v18 or higher).
-  * An operational **Telegram Bot** token.
-  * An **Appwrite** server instance with a project ID and API key.
-
-### CLI Installation
-
-To run `tsbin`, clone the repository and execute the main script using `node` or `npx`:
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/arnav-terex/tsbin.git
-    cd tsbin
-    ```
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    # or
-    yarn install
-    ```
-3.  The CLI is executed via the `tsbin.js` file:
-    ```bash
-    node tsbin.js <command> [options]
-    # For simplicity, this documentation will use 'tsbin' as a placeholder.
-    ```
-
-### Configuration (`.env` File)
-
-The CLI requires sensitive credentials to communicate with Telegram and Appwrite. These must be defined in a **`.env`** file in the project's root directory.
-
-| Variable | Description | Source |
-| :--- | :--- | :--- |
-| `TELEGRAM_BOT_TOKEN` | Your unique token from Telegram's BotFather. This is used for file storage. | |
-| `APPWRITE_ENDPOINT` | The URL for your Appwrite server. | |
-| `APPWRITE_PROJECT_ID` | The ID of your Appwrite project. | |
-| `APPWRITE_API_KEY` | An API key created in your Appwrite console for server-side access. | |
-| `APPWRITE_DATABASE_ID` | The ID of the database you have set up in Appwrite. | |
-| `APPWRITE_COLLECTION_ID` | The ID of the collection within the database where metadata is stored. | |
-
-**Example `.env.example` content:**
+## 🧾 Directory Structure
 
 ```
-TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-APPWRITE_ENDPOINT=http://localhost/v1
-APPWRITE_PROJECT_ID=659a8523362a74423405
-APPWRITE_API_KEY=eyJra...
-APPWRITE_DATABASE_ID=659a856f643e2329759d
-APPWRITE_COLLECTION_ID=659a8576d1e4e460d032
+cli/
+├── bin/
+│   └── tsbin.js
+├── downloads/
+│   └── a.txt
+├── src/
+│   ├── decryptSnippet.js
+│   ├── download.js
+│   ├── snippet.js
+│   └── upload.js
+├── test/
+│   └── a.txt
+├── utils/
+│   └── encryptFile.js
+├── .env
+├── .env.example
+├── package-lock.json
+├── package.json
+└── README.md
 ```
 
-> **Action:** Copy `template.env` to `.env` and fill in your values.
 
------
+---
 
-## 💻 3. CLI Usage and Commands
+## ⚡ Setup
 
-The CLI structure is based on a primary command followed by specific arguments and options.
+### Install dependencies
+  ```bash
+  npm install
+  ```
+### Set up environment
 
-### Global Commands
-
-| Command | Alias | Description |
-| :--- | :--- | :--- |
-| `node tsbin.js help` | `h` | Displays the help message and command syntax. |
-
-### 3.1. `upload` Command
-
-Encrypts a file and uploads it to Telegram storage, then stores the metadata on Appwrite.
-
-**Syntax:**
-
-```bash
-node tsbin.js upload <path/to/file> [options]
+Create a .env file in your root directory:
+```
+  API_BASE_URL=https://api.tsbin.tech
+```
+### Make Executable
+Make the CLI entry point globally runnable (useful for development/testing):
+```
+chmod +x ./bin/tsbin.js
 ```
 ### Run using NPX
 ```
 npx tsbin <command>
 ```
 
-| Option | Alias | Description | Type |
-| :--- | :--- | :--- | :--- |
-| `--passcode` | `-p` | **Optional.** A passcode (secret key) used for symmetric encryption of the file. This passcode is required for decryption. | `string` |
-| `--expiry` | `-e` | **Optional.** Sets the time until the file expires (e.g., `1h`, `24h`, `7d`). *(Planned)*. | `string` |
+---
+## 🚀 Usage
 
-**Example: Encrypt and upload a PDF with a 4-digit passcode**
+All commands are executed via `npx tsbin <command>`.
+
+### 🗂 Upload a File
+
+Encrypts and uploads a file securely to the tsbin API.
 
 ```bash
-node tsbin.js upload ./confidential.pdf --passcode 1234
-# Output:
-# File Encrypted and Uploaded!
-# ID: 65b1234567890abcdef0001
-# Share Link: [Your Appwrite Endpoint]/f/65b1234567890abcdef0001
+npx tsbin upload ./test/a.txt --passcode mySecret
+```
+Output Example:
+
+```
+🔐 Encrypting file...
+📤 Uploading to tsbin API...
+✅ Upload successful!
+🧾 Response: {
+  success: true,
+  data: 'ts_QukIVdQc',
+  message: 'Trash created successfully'
+}
+```
+### 📥 Download and Decrypt
+
+Downloads and decrypts a previously uploaded file.
+
+```bash
+npx tsbin download <file-id> --passcode mySecret
 ```
 
-### 3.2. `download` Command
-
-Retrieves the encrypted file from Telegram using the ID, downloads it, and decrypts it locally.
-
-**Syntax:**
+Output Example:
 
 ```bash
-node tsbin.js download <file-id> [options]
+📥 Fetching from tsbin API...
+🔓 Decrypting file...
+✅ Download complete! Saved to cli\downloads\a.txt
 ```
 
-| Option | Alias | Description | Type |
-| :--- | :--- | :--- | :--- |
-| `--passcode` | `-p` | **Mandatory if file is protected.** The secret key required to decrypt the file. | `string` |
-
-**Example: Download and decrypt the protected file**
-
-```bash
-node tsbin.js download 65b1234567890abcdef0001 --passcode 1234
-# Output:
-# File 65b1234567890abcdef0001 downloaded and decrypted successfully as confidential.pdf
+If the passcode is incorrect:
+```
+❌ Download/decrypt failed: Wrong passcode or corrupted file — decryption failed.
 ```
 
-### 3.3. `snippet` Command
-
-Encrypts a short string of text and uploads it as a text snippet. The snippet is stored as a small file.
-
-**Syntax:**
-
-```bash
-node tsbin.js snippet "<text/string>" [options]
+## Encrypt & Share a Snippet
+Encrypts a plain text snippet and uploads it to the tsbin API.
+```
+Encrypts a plain text snippet and uploads it to the tsbin API
 ```
 
-| Option | Alias | Description | Type |
-| :--- | :--- | :--- | :--- |
-| `--passcode` | `-p` | **Optional.** A passcode for securing the text snippet. | `string` |
-
-**Example: Sharing a temporary API key**
+Output Example:
 
 ```bash
-node tsbin.js snippet "API_SECRET=a1b2c3d4e5f6" -p key-access
-# Output:
-# Snippet Encrypted and Uploaded!
-# ID: 65b1234567890abcdef0002
-# Share Link: [Your Appwrite Endpoint]/s/65b1234567890abcdef0002
+Output Example:
+
+```bash
+🔐 Encrypting snippet...
+📤 Uploading encrypted snippet to tsbin API...
+✅ Snippet uploaded successfully!
+🔗 Share ID: ts_wgzxskJ5
+Use this to decrypt:
+npx tsbin decrypt-snippet --id ts_wgzxskJ5 --passcode mySecret123
+```
+
+## 🔓 Decrypt a Snippet
+Fetches and decrypts a snippet uploaded via snippet.
+
+```
+npx tsbin decrypt-snippet --data ts_wgzxskJ5 --passcode mySecret123
+```
+
+Output:
+```
+📡 Fetching snippet data...
+🔓 Decrypting snippet...
+✅ Decryption successful!
+
+📜 Decrypted Snippet:
+───────────────────────────────
+Hello World from TsBin!
+───────────────────────────────
 ```
 ## 📋 List All Items (⚠️ API not implemented)
 ```
@@ -181,50 +175,82 @@ Fetch detailed info about a specific item.
 🔒 Encrypted: Yes
 ```
 
-### 3.4. `decryptSnippet` Command
+## 🔒 Encryption Flow
+### Upload Process
 
-Retrieves and decrypts an encrypted text snippet, displaying the result to the console.
+- Derives a 256-bit key from your passcode using SHA-256
 
-**Syntax:**
+- Generates a random 16-byte IV
 
-```bash
-node tsbin.js decryptSnippet <snippet-id> [options]
+- Encrypts the file with AES-256-CBC
+
+- Uploads the .enc file to Telegram
+
+### Download Process
+
+- Fetches the encrypted .enc file from Telegram
+
+- Recreates the AES key from the same passcode
+
+- Decrypts the data locally
+
+- Restores the original filename
+
+- Snippets follow the same process — except the encrypted payload is sent as text.
+
+## 🧩 Example Workflow
+ ```
+ # Upload
+npx tsbin upload ./test/a.txt --passcode mySecret
+
+# Share the printed File ID with a friend
+
+# Download (on another machine)
+npx tsbin download <file-id> --passcode mySecret
+ ```
+
+ ⚠️ Notes
+
+- 📨 tsbin uses https://api.tsbin.tech
+ as the backend for uploads
+
+- 🔐 All encryption/decryption is local (E2E)
+
+- ⚠️ Passcodes must match exactly or decryption will fail
+
+- 💾 No IV, key, or filename metadata is stored unencrypted
+
+- 🚧 Listing (list) and fetching (get) are partial — backend under development
+
+## 🧑‍💻 Example .env File
+```
+API_BASE_URL=https://api.tsbin.tech
 ```
 
-| Option | Alias | Description | Type |
-| :--- | :--- | :--- | :--- |
-| `--passcode` | `-p` | **Mandatory if snippet is protected.** The secret key used during upload. | `string` |
-
-**Example: Decrypting and viewing the shared key**
-
-```bash
-node tsbin.js decryptSnippet 65b1234567890abcdef0002 -p key-access
-# Output:
-# Decrypting Snippet...
-# Snippet Content: API_SECRET=a1b2c3d4e5f6
+### 🧱 Example Commands for Testing
 ```
+# Upload
+npx tsbin upload ./test/a.txt --passcode mySecret
 
------
+# Download
+npx tsbin download ts_QukIVdQc --passcode mySecret
 
-## 🚧 4. Troubleshooting and FAQs
+# Encrypt Snippet
+npx tsbin snippet "Hello from TsBin" --passcode mySecret123
 
-### Common Issues
+# Decrypt Snippet
+npx tsbin decrypt-snippet --data ts_ABC12345 --passcode mySecret123
 
-| Issue | Cause | Solution |
-| :--- | :--- | :--- |
-| **`Error: TELEGRAM_BOT_TOKEN not set`** | Missing or incorrect variable in your `.env` file. | Ensure you have copied `template.env` to `.env` and all required environment variables are set correctly. |
-| **`Download failed: Invalid Passcode`** | The wrong passcode was provided during the `download` or `decryptSnippet` command. | Verify the exact passcode used for the original `upload` or `snippet` command. The passcode is the decryption key. |
-| **`Error: Decryption failed`** | Incorrect key size or corrupted file/data during download. | Check the passcode. If the file was downloaded manually outside of the CLI, ensure it is the exact raw data from Telegram. |
-| **`Appwrite connection failed`** | Incorrect `APPWRITE_ENDPOINT`, `APPWRITE_PROJECT_ID`, or `APPWRITE_API_KEY`. | Double-check all Appwrite credentials and ensure your Appwrite server is running and accessible. |
-| **File is not available after expiry** | The file's configured expiry time has been reached. | The file is permanently deleted from storage. You must re-upload the file. |
+# List all (stub)
+npx tsbin list
 
-### Security FAQ
-
-**Q: Where are my files stored?**
-A: Encrypted files are stored on **Telegram** using your Bot's API. Metadata (like file ID and filename) is stored on your **Appwrite** instance.
-
-**Q: Can the service providers (Telegram, Appwrite) read my files?**
-A: **No.** Files are encrypted on your local machine *before* being uploaded to Telegram. Neither Telegram nor the Appwrite metadata service holds the key required for decryption.
-
-**Q: Is the passcode required?**
-A: No, but it is highly recommended. The passcode serves as the symmetric encryption key. If no passcode is provided, a key is likely generated locally for E2EE, but the use of a unique, memorable passcode adds a layer of protection against unauthorized access.
+# Get one (inspect JSON)
+npx tsbin get ts_ABC12345
+```
+### Tech Stack
+- Node.js (v18+)
+- Commander.js — for CLI handling
+- Axios — for API calls
+- Crypto — AES-256 encryption/decryption
+- dotenv — environment management
+- chalk — colorful terminal output
