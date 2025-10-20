@@ -156,7 +156,7 @@ export class TrashService {
         views: 0,
         expires_at: expireAt || null,
         size: totalSize,
-        message_ids: fileMetadata.map((f) => f.message_id.toString()), // telegramService.uploadFile method returns a message_id that is a number and Appwrite collection expects message_ids to be an array of strings
+        message_ids: fileMetadata.map((f) => f.message_id),
         chat_id: '',
       };
 
