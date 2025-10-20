@@ -1,53 +1,59 @@
 // src/download.js
-import path from "path";
 import fs from "fs";
-import { telegramDownload } from "./telegramDownload.js";
-import { decryptFile } from "./crypto.js";
+import path from "path";
+import axios from "axios";
+import crypto from "crypto";
+
+function decryptBuffer(encryptedBuffer, passcode) {
+  const key = crypto.createHash("sha256").update(passcode).digest();
+  const iv = encryptedBuffer.subarray(0, 16);
+  const ciphertext = encryptedBuffer.subarray(16);
+
+  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+}
 
 export async function downloadFile(fileId, passcode) {
-  const downloadsDir = "./downloads";
-
   try {
-    console.log("📥 Downloading encrypted file...");
-    const tempEncryptedPath = await telegramDownload(fileId, downloadsDir);
+    console.log("Fetching from tsbin API...");
+    const res = await axios.get(`https://api.tsbin.tech/v1/trash/${fileId}`);
+    const trash = res.data?.data;
 
-    console.log("🔓 Decrypting and restoring original filename...");
-
-    let outputPath, originalName, iv;
-
-    try {
-      // Try decrypting the file
-      const result = await decryptFile(tempEncryptedPath, downloadsDir, passcode);
-      outputPath = result.outputPath;
-      originalName = result.originalName;
-      iv = result.iv;
-    } catch (decryptErr) {
-      // If decryption fails, don't leave garbage files
-      if (fs.existsSync(tempEncryptedPath)) {
-        fs.unlinkSync(tempEncryptedPath);
-      }
-      throw new Error("Wrong passcode or corrupted file — decryption failed.");
+    if (!trash) {
+      console.error("No data returned from API.");
+      return;
     }
 
-    // Remove the temporary encrypted file after successful decryption
-    try {
-      fs.unlinkSync(tempEncryptedPath);
-      console.log(`🧹 Removed temporary encrypted file: ${tempEncryptedPath}`);
-    } catch (e) {
-      console.warn("⚠️ Could not delete temporary file:", e.message);
+    // Detect possible content locations
+    let encBase64;
+    let meta;
+
+    if (trash.encryptedContent) {
+      encBase64 = trash.encryptedContent;
+      meta = trash.meta || {};
+    } else if (trash.encryptedFiles?.[0]?.encryptedContent) {
+      encBase64 = trash.encryptedFiles[0].encryptedContent;
+      meta = trash.encryptedFiles[0].meta || {};
     }
 
-    console.log(`✅ Decrypted successfully: ${outputPath}`);
-    console.log(`🧩 IV used (hex): ${iv}`);
+    if (!encBase64) {
+      console.error("No encrypted content found.");
+      return;
+    }
+
+    console.log("Decrypting file...");
+    const encryptedBuffer = Buffer.from(encBase64, "base64");
+    const decrypted = decryptBuffer(encryptedBuffer, passcode);
+
+    const fileName = meta.fileName || `${fileId}.bin`;
+    const saveDir = path.join("cli", "downloads");
+    fs.mkdirSync(saveDir, { recursive: true });
+
+    const savePath = path.join(saveDir, fileName);
+    fs.writeFileSync(savePath, decrypted);
+
+    console.log(`Download complete! Saved to ${savePath}`);
   } catch (err) {
-    console.error("❌ Download/decrypt failed:", err.message);
-
-    // Cleanup in case partial decrypted file exists
-    const possibleFile = path.join("./downloads", "output.txt");
-    if (fs.existsSync(possibleFile)) {
-      try {
-        fs.unlinkSync(possibleFile);
-      } catch {}
-    }
+    console.error("Download error:", err.response?.data || err.message);
   }
 }
