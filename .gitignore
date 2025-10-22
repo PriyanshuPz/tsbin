@@ -83,6 +83,19 @@ web_modules/
 .env.production.local
 .env.local
 
+# Add negation rules to explicitly un-ignore all .env.example files
+!.env.example
+!frontend/.env.example
+!backend/.env.example
+
+# Adding explicit folder-based exclusions for clarity in a monorepo
+frontend/.env*
+backend/.env*
+cli/.env*
+# Ensure .env.example files are not blocked by the explicit folder-based exclusions
+!frontend/.env.example
+!backend/.env.example
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
@@ -142,3 +155,4 @@ dist
 .svelte-kit
 
 # End of https://www.toptal.com/developers/gitignore/api/node
+
