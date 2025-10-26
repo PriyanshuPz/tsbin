@@ -1,0 +1,18 @@
+[package]
+name = "tsbin-wasm"
+version = "0.1.0"
+edition = "2024"
+authors = ["Priyanshu Verma <priyanshuverma@outlook.in>"]
+
+[lib]
+crate-type = ["cdylib"]
+
+
+[dependencies]
+aes-gcm = "0.10.3"
+sha2 = "0.10.9"
+pbkdf2 = { version = "0.12", features = ["simple"] }
+getrandom = { version = "0.2", features = ["js"] } 
+wasm-bindgen = "0.2.104"
+generic-array = {version = "1.3.5", features = ["compat-0_14"]}
+
