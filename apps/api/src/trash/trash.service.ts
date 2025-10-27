@@ -1,16 +1,17 @@
 import { HttpException, Injectable } from '@nestjs/common';
-import { CreateTrashDto } from './dto/create-trash.dto';
-import { UpdateTrashDto } from './dto/update-trash.dto';
+import { CreateTextTrashDto, CreateTrashDto } from './dto/create-trash.dto';
 import { AppwriteService } from 'src/appwrite/appwrite.service';
 import { TelegramService } from 'src/telegram/telegram.service';
-import { generateId } from 'src/lib/utils';
+import { generateId, id } from 'src/lib/utils';
 import { ErrorResponse } from 'src/lib/exception-filter';
+import { PrismaService } from 'src/service/prisma.service';
 
 @Injectable()
 export class TrashService {
   constructor(
     private readonly appwriteService: AppwriteService,
     private readonly telegramService: TelegramService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   async create(createTrashDto: CreateTrashDto) {
@@ -24,12 +25,12 @@ export class TrashService {
     } = createTrashDto;
 
     if (type === 'text') {
-      return this.createTextTrash({
-        encryptedContent,
-        meta,
-        passcodeHash,
-        expireAt,
-      });
+      // return this.createTextTrash({
+      //   encryptedContent,
+      //   meta,
+      //   passcodeHash,
+      //   expireAt,
+      // });
     } else if (type === 'file') {
       return this.createFileTrash({
         encryptedFiles,
@@ -41,51 +42,44 @@ export class TrashService {
     }
   }
 
-  private async createTextTrash({
-    encryptedContent,
-    meta,
-    passcodeHash,
-    expireAt,
-  }: {
-    encryptedContent?: string;
-    meta?: any;
-    passcodeHash: string;
-    expireAt?: Date;
-  }) {
-    if (!encryptedContent || !passcodeHash) {
+  async createTextTrash({
+    enc_trash_text,
+    encryption_metadata,
+    text_length,
+    expire_at,
+  }: CreateTextTrashDto) {
+    if (!enc_trash_text || !encryption_metadata || !text_length) {
       throw new Error(
-        'Missing required fields: encryptedContent, meta, passcodeHash',
+        'Missing required fields: enc_trash_text, encryption_metadata, text_length',
       );
     }
 
     const slug = generateId('ts');
 
-    const data = {
-      type: 'text',
-      content: encryptedContent,
-      encryption_meta: JSON.stringify(meta || {}),
-      passcode_hash: passcodeHash,
-      encrypted: passcodeHash !== '0000',
-      slug,
-      views: 0,
-      expires_at: expireAt || null,
-      size: encryptedContent.length,
-      message_ids: [], // Not used for text
-      chat_id: '', // Not used for text
-    };
-
     try {
-      const rec = await this.appwriteService.getDb().createRow({
-        rowId: slug,
-        data: data,
-        databaseId: this.appwriteService.getDatabaseId(),
-        tableId: 'trash',
+      await this.prismaService.trash.create({
+        data: {
+          id: id('ts'),
+          slug,
+          type: 'TEXT',
+          encrypted: encryption_metadata.passcode_hash !== '0000',
+          passcodeHash: encryption_metadata.passcode_hash,
+          expireAt: expire_at,
+          textTrash: {
+            create: {
+              id: id('txt'),
+              enc_trash_text,
+              text_length,
+              encryption_type: encryption_metadata.encryption_type,
+            },
+          },
+        },
       });
-      return rec.slug;
+
+      return slug;
     } catch (error) {
-      console.log(error);
       throw new ErrorResponse(
-        `BAAS: Failed to create text trash - ${error.message}`,
+        `DB: Failed to create text trash - ${error.message}`,
         500,
       );
     }
@@ -215,87 +209,15 @@ export class TrashService {
     };
   }
 
-  async findOne(slug: string) {
+  async findOne(id: string) {
     try {
-      const rows = await this.appwriteService.getDb().getRow({
-        databaseId: this.appwriteService.getDatabaseId(),
-        tableId: 'trash',
-        rowId: slug,
+      const trash = await this.prismaService.trash.findUnique({
+        where: { slug: id },
       });
-
-      const trash = rows;
-
-      // Increment view count
-      await this.appwriteService.getDb().updateRow({
-        databaseId: this.appwriteService.getDatabaseId(),
-        tableId: 'trash',
-        rowId: trash.$id,
-        data: { views: trash.views + 1 },
-      });
-
-      if (trash.expires_at && new Date(trash.expires_at) < new Date()) {
-        throw new HttpException('Trash has expired', 410);
-      }
-
-      const isDefaultPasscode = !trash.encrypted; // adjust if using hash
-      const sizeThreshold = 10 * 1024 * 1024; // 10 MB
-      const sendContent =
-        trash.type === 'text' &&
-        (isDefaultPasscode || trash.size <= sizeThreshold);
-
-      const result: any = {
-        id: trash.$id,
-        slug: trash.slug,
-        type: trash.type,
-        encrypted: trash.encrypted,
-        passcode_hash: trash.passcode_hash,
-        views: trash.views + 1,
-        expires_at: trash.expires_at,
-        size: trash.size,
-        created_at: trash.$createdAt,
-        sendContent,
-      };
-
-      if (sendContent && trash.type === 'text') {
-        result.content = trash.content;
-        result.encryption_meta = trash.encryption_meta
-          ? JSON.parse(trash.encryption_meta)
-          : null;
-      }
-
-      // For file type, group message IDs by file for chunked system
-      if (trash.type === 'file') {
-        result.encryption_meta = trash.encryption_meta
-          ? JSON.parse(trash.encryption_meta)
-          : null;
-
-        const fileData = JSON.parse(trash.content);
-
-        if (fileData.files && Array.isArray(fileData.files)) {
-          // Group chunks by file name
-          const fileGroups = new Map();
-
-          for (const fileInfo of fileData.files) {
-            const fileName = fileInfo.meta.fileName;
-            if (!fileGroups.has(fileName)) {
-              fileGroups.set(fileName, {
-                meta: fileInfo.meta,
-                messageIds: [],
-                fileIds: [],
-              });
-            }
-            fileGroups.get(fileName).messageIds.push(fileInfo.message_id);
-            fileGroups.get(fileName).fileIds.push(fileInfo.file_id);
-          }
-
-          // Convert to array
-          result.files = Array.from(fileGroups.values());
-        }
-      }
 
       return {
         success: true,
-        data: result,
+        data: trash,
         message: 'Trash retrieved successfully',
       };
     } catch (error) {
@@ -304,25 +226,75 @@ export class TrashService {
     }
   }
 
-  update(id: number, updateTrashDto: UpdateTrashDto) {
-    return `This action updates a #${id} trash`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} trash`;
-  }
-
   async findTrashById(id: string) {
     try {
-      const trash = await this.appwriteService.getDb().getRow({
-        databaseId: this.appwriteService.getDatabaseId(),
-        tableId: 'trash',
-        rowId: id,
+      const trash = await this.prismaService.trash.findUnique({
+        where: { slug: id },
+        select: {
+          badReport: true,
+          createdAt: true,
+          encrypted: true,
+          expireAt: true,
+          id: true,
+          slug: true,
+          type: true,
+          fileTrash: {
+            select: {
+              id: true,
+            },
+          },
+          textTrash: {
+            select: {
+              id: true,
+            },
+          },
+        },
       });
-      return trash;
+
+      if (!trash) {
+        throw new Error('Trash not found');
+      }
+
+      let objId: string | null = null;
+
+      const { fileTrash, textTrash, ...rest } = trash;
+      if (trash.type === 'FILE' && fileTrash) {
+        objId = fileTrash.id;
+      } else if (trash.type === 'TEXT' && textTrash) {
+        objId = textTrash.id;
+      }
+
+      return {
+        success: true,
+        data: {
+          ...rest,
+          objectId: objId,
+        },
+        message: 'Trash retrieved successfully',
+      };
     } catch (error) {
       throw new ErrorResponse(
-        `BAAS: Failed to find trash by ID - ${error.message}`,
+        `DB: Failed to find trash by ID - ${error.message}`,
+        500,
+      );
+    }
+  }
+
+  async findTextTrashById(id: string) {
+    try {
+      const textTrash = await this.prismaService.textTrash.findUnique({
+        where: {
+          id,
+        },
+        include: {
+          trash: true,
+        },
+      });
+
+      return textTrash;
+    } catch (error) {
+      throw new ErrorResponse(
+        `DB: Failed to find text trash by ID - ${error.message}`,
         500,
       );
     }

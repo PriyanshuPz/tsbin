@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/_generated/prisma"
+  importFileExtension    = "js"
+  moduleFormat           = "cjs"
+  generatedFileExtension = "ts"
+  runtime                = "nodejs"
+  engineType             = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TrashType {
+  TEXT
+  FILE
+}
+
+model Trash {
+  id   String    @id @default(cuid())
+  type TrashType
+
+  slug         String    @unique
+  badReport    Int       @default(0)
+  encrypted    Boolean
+  passcodeHash String
+  createdAt    DateTime  @default(now())
+  expireAt     DateTime?
+
+  // For TEXT
+  textTrash TextTrash?
+
+  // For FILE
+  fileTrash FileTrash?
+}
+
+model TextTrash {
+  id              String @id @default(cuid())
+  enc_trash_text  String
+  text_length     Int
+  encryption_type String
+
+  trash   Trash  @relation(fields: [trashId], references: [id], onDelete: Cascade)
+  trashId String @unique
+}
+
+model FileTrash {
+  id String @id @default(cuid())
+
+  file_ids        String[]
+  message_ids     String[]
+  chunk_size      Int
+  total_chunks    Int
+  encryption_type String
+  original_name   String
+  file_size       Int
+
+  trash   Trash  @relation(fields: [trashId], references: [id], onDelete: Cascade)
+  trashId String @unique
+}

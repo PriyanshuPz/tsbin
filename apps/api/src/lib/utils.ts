@@ -4,14 +4,19 @@ export type Base = {
   data?: any;
 };
 
+import { customAlphabet } from 'nanoid';
+import { ulid } from 'ulid';
+
 export function generateId(prefix: string, length = 8) {
-  const chars =
+  const alphabet =
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `${prefix}_${result}`;
+  const nanoid = customAlphabet(alphabet, length); // 8–10 is a good default
+  const shortCode = nanoid(); // e.g. 'aZ8fGx12'
+  return `${prefix}_${shortCode}`;
+}
+
+export function id(prefix = 'obj') {
+  return `${prefix}_${ulid()}`;
 }
 
 export function ab2b64(buf: ArrayBuffer) {

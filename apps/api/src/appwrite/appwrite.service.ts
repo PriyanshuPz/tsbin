@@ -9,15 +9,15 @@ export class AppwriteService {
   private databaseId: string;
 
   constructor(private readonly configService: ConfigService) {
-    const projectId = this.configService.get<string>('APPWRITE_PROJECT_ID');
-    const projectEndpoint = this.configService.get<string>('APPWRITE_ENDPOINT');
-    const apiKey = this.configService.get<string>('APPWRITE_API_KEY');
-    const databaseId = this.configService.get<string>('APPWRITE_DATABASE_ID');
-    if (!projectId || !projectEndpoint || !apiKey || !databaseId) {
-      throw new Error(
-        'APPWRITE_PROJECT_ID, APPWRITE_ENDPOINT, APPWRITE_API_KEY, and APPWRITE_DATABASE_ID must be defined in environment variables',
-      );
-    }
+    const projectId =
+      this.configService.get<string>('APPWRITE_PROJECT_ID') || '';
+    const projectEndpoint =
+      this.configService.get<string>('APPWRITE_ENDPOINT') ||
+      'https://cloud.appwrite.io/v1';
+    const apiKey = this.configService.get<string>('APPWRITE_API_KEY') || '';
+    const databaseId =
+      this.configService.get<string>('APPWRITE_DATABASE_ID') || '';
+
     this.databaseId = databaseId;
 
     this.client = new Client()

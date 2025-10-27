@@ -1,8 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import MainBin from "./components/MainBin";
-import TrashView from "./components/TrashView";
 import Footer from "./components/Footer";
+import TrashPage from "./components/TrashPage";
 
 export default function App() {
   return (
@@ -11,7 +11,7 @@ export default function App() {
         <div className="flex-1">
           <Routes>
             <Route path="/" element={<MainBin />} />
-            <Route path="/t/:id" element={<TrashView />} />
+            <Route path="/t/:id" element={<TrashPage />} />
           </Routes>
         </div>
         <Footer />

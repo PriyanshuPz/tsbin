@@ -1,7 +1,5 @@
-import init, { Encryptor } from "tsbin-wasm";
-
+import init, { TsbinController, Encryptor } from "tsbin-wasm";
 import { SITE_CONFIG } from "./constants";
-import { hashPasscode } from "./encryption";
 
 export async function sendTrash(data: {
   type: "text" | "file";
@@ -11,210 +9,40 @@ export async function sendTrash(data: {
   expireAt?: Date;
   onProgress?: (progress: number) => void;
 }) {
-  await init();
-  const passcode = data.passcode || "0000";
+  try {
+    await init();
+    const passcode = data.passcode || "0000";
 
-  let encryptedContent: string | undefined = undefined;
-  let meta: any = undefined;
+    let trashId: string | undefined = undefined;
 
-  const encryptor = new Encryptor(passcode);
+    const ts = new TsbinController(SITE_CONFIG.API_URL, "");
 
-  if (data.type === "text") {
-    if (!data.textContent) {
-      throw new Error("textContent is required for text type");
-    }
-    // text to U8Array
-    const textEncoder = new TextEncoder();
-    const dataU8 = textEncoder.encode(data.textContent);
-
-    const encrypted = encryptor.encrypt(dataU8);
-
-    // Uint8Array<ArrayBufferLike> to base64
-    encryptedContent = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
-  }
-
-  if (data.type === "file") {
-    if (!data.files || data.files.length === 0) {
-      throw new Error("files are required for file type");
-    }
-
-    const res = await sendLargeFileTrash(
-      data.files[0],
-      passcode,
-      data.expireAt,
-      data.onProgress
-    );
-    // Encrypt each file with error handling
-    for (const file of data.files) {
-      try {
-        console.log(`File ${file.name} uploaded with Trash ID: ${res.data}`);
-      } catch (error) {
-        console.error(`Failed to encrypt file ${file.name}:`, error);
-        throw new Error(
-          `Failed to encrypt file "${file.name}". File may be too large or corrupted.`
-        );
+    if (data.type === "text") {
+      if (!data.textContent) {
+        throw new Error("textContent is required for text type");
       }
+      trashId = await ts.encrypt_text(data.textContent, passcode);
     }
+
+    if (data.type === "file") {
+      if (!data.files || data.files.length === 0) {
+        throw new Error("files are required for file type");
+      }
+      const file = data.files[0];
+      trashId = await ts.encrypt_file(file, passcode);
+    }
+
     return {
       success: true,
-      data: res.data,
-      message: "Files uploaded successfully",
+      data: trashId,
     };
-  }
-  const passcodeHash = await hashPasscode(passcode);
-  const payload: any = {
-    type: data.type,
-    passcodeHash,
-    expireAt: data.expireAt?.toISOString() || null,
-  };
-
-  if (data.type === "text") {
-    payload.encryptedContent = encryptedContent;
-    payload.meta = meta;
-  }
-
-  const response = await fetch(`${SITE_CONFIG.API_URL}/trash`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const result = await response.json();
-
-  // Handle rate limiting
-  if (response.status === 429) {
-    const retryAfter = response.headers.get("Retry-After");
-    const retryMessage = retryAfter
-      ? `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again.`
-      : "Rate limit exceeded. Please wait a moment before trying again.";
-
+  } catch (error) {
+    console.error("sendTrash error:", error);
     return {
       success: false,
-      message: retryMessage,
-      data: null,
+      message: (error as Error).message || "Failed to send trash",
     };
   }
-
-  return result;
-  // { success: boolean, data: <id>, message: string }
-}
-
-export async function sendLargeFileTrash(
-  file: File,
-  passcode: string,
-  expireAt?: Date,
-  onProgress?: (progress: number) => void
-) {
-  await init();
-  const encryptor = new Encryptor(passcode);
-  const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB
-
-  const reader = file.stream().getReader();
-  const messageIds: number[] = [];
-  const fileIds: string[] = [];
-  let chunkIndex = 0;
-  let totalUploaded = 0;
-
-  let buffer = new Uint8Array(CHUNK_SIZE);
-  let bufferOffset = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    let offset = 0;
-    while (offset < value.length) {
-      const toCopy = Math.min(value.length - offset, CHUNK_SIZE - bufferOffset);
-      buffer.set(value.slice(offset, offset + toCopy), bufferOffset);
-      bufferOffset += toCopy;
-      offset += toCopy;
-
-      if (bufferOffset === CHUNK_SIZE) {
-        const encryptedChunk = encryptor.encrypt(buffer);
-        const chunkMeta = {
-          fileName: file.name,
-          fileSize: file.size,
-          chunkIndex,
-        };
-
-        // Convert WASM output to standard Uint8Array for blob compatibility
-        const encryptedData = new Uint8Array(encryptedChunk);
-
-        // Create FormData to send binary data directly
-        const formData = new FormData();
-        formData.append("encryptedChunk", new Blob([encryptedData]));
-        formData.append("meta", JSON.stringify(chunkMeta));
-
-        // POST the chunk to server; server uploads to Telegram
-        const res = await fetch(`${SITE_CONFIG.API_URL}/trash/chunk`, {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await res.json();
-        messageIds.push(data.message_id);
-        fileIds.push(data.file_id);
-
-        // Update progress
-        totalUploaded += CHUNK_SIZE;
-        const progress = Math.min((totalUploaded / file.size) * 100, 100);
-        onProgress?.(progress);
-
-        chunkIndex++;
-        bufferOffset = 0;
-      }
-    }
-  }
-
-  // Final partial chunk
-  if (bufferOffset > 0) {
-    const lastChunk = buffer.slice(0, bufferOffset);
-    const encryptedChunk = encryptor.encrypt(lastChunk);
-    const chunkMeta = { fileName: file.name, fileSize: file.size, chunkIndex };
-
-    // Convert WASM output to standard Uint8Array for blob compatibility
-    const encryptedData = new Uint8Array(encryptedChunk);
-
-    // Create FormData to send binary data directly
-    const formData = new FormData();
-    formData.append("encryptedChunk", new Blob([encryptedData]));
-    formData.append("meta", JSON.stringify(chunkMeta));
-
-    const res = await fetch(`${SITE_CONFIG.API_URL}/trash/chunk`, {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await res.json();
-    messageIds.push(data.message_id);
-    fileIds.push(data.file_id);
-    // Final progress update
-    onProgress?.(100);
-  }
-
-  // All chunks uploaded — now create Trash record in Appwrite
-  const passcodeHash = await hashPasscode(passcode);
-  const payload = {
-    type: "file",
-    passcodeHash,
-    expireAt: expireAt?.toISOString() || null,
-    encryptedFiles: [
-      {
-        meta: { fileName: file.name, fileSize: file.size },
-        messageIds,
-        fileIds,
-      },
-    ],
-  };
-
-  const response = await fetch(`${SITE_CONFIG.API_URL}/trash`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const trashResult = await response.json();
-  return trashResult;
 }
 
 export async function fetchTrash(slug: string) {

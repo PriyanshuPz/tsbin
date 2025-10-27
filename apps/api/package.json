@@ -26,12 +26,18 @@
     "@nestjs/mapped-types": "*",
     "@nestjs/platform-express": "^11.1.7",
     "@nestjs/throttler": "^6.4.0",
+    "@prisma/adapter-pg": "^6.18.0",
+    "@prisma/client": "^6.18.0",
     "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
     "form-data": "^4.0.4",
     "multer": "^2.0.2",
+    "nanoid": "^5.1.6",
     "node-appwrite": "^20.2.1",
+    "prisma": "^6.18.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "ulid": "^3.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

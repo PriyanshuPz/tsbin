@@ -32,3 +32,15 @@ export class CreateTrashDto {
   // Optional metadata
   expireAt?: Date;
 }
+
+export class CreateTextTrashDto {
+  enc_trash_text: string;
+  text_length: number;
+  expire_at?: Date;
+  encryption_metadata: {
+    encryption_type: string;
+    expire_at: string | null;
+    original_length: number;
+    passcode_hash: string;
+  };
+}

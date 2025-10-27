@@ -28,6 +28,7 @@ interface TrashData {
 
 export default function TrashView() {
   const { id } = useParams<{ id: string }>();
+
   const [trashData, setTrashData] = useState<TrashData | null>(null);
   const [currentAction, setCurrentAction] = useState<string>("");
   const [displayContent, setDisplayContent] = useState<string>("");
