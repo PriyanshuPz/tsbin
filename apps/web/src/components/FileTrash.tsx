@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTrashContext } from "../context/useTrashContext";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
 
 export default function FileTrash() {
   const {
@@ -15,21 +15,37 @@ export default function FileTrash() {
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const navigate = useNavigate();
+
   if (isLoadingTrash || isLoadingContent) {
-    return <div className="w-full p-6 text-sm text-gray-600">Loading...</div>;
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto mb-2"></div>
+          <p className="text-sm text-gray-600">Loading file...</p>
+        </div>
+      </div>
+    );
   }
 
   if (errorLoadingTrash || errorLoadingContent) {
     return (
-      <div className="w-full p-6 text-sm text-gray-600">
-        Error loading file.
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="text-center">
+          <div className="text-3xl text-gray-300 mb-4">❌</div>
+          <p className="text-sm text-gray-600">Error loading file</p>
+        </div>
       </div>
     );
   }
 
   if (!trashContent) {
     return (
-      <div className="w-full p-6 text-sm text-gray-600">No file found.</div>
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="text-center">
+          <div className="text-3xl text-gray-300 mb-4">📁</div>
+          <p className="text-sm text-gray-600">No file found</p>
+        </div>
+      </div>
     );
   }
 
@@ -40,6 +56,36 @@ export default function FileTrash() {
   const url = file.downloadUrl;
 
   const isImage = type && String(type).startsWith("image");
+  const isVideo = type && String(type).startsWith("video");
+  const isAudio = type && String(type).startsWith("audio");
+  const isText =
+    type &&
+    (String(type).startsWith("text") ||
+      type.includes("json") ||
+      type.includes("xml"));
+
+  const formatFileSize = (sizeStr: string): string => {
+    // If size is already formatted, return as is
+    if (typeof sizeStr === "string" && sizeStr.includes(" ")) {
+      return sizeStr;
+    }
+    // If it's a number, format it
+    const bytes = parseInt(sizeStr);
+    if (isNaN(bytes)) return sizeStr;
+
+    const sizes = ["B", "KB", "MB", "GB"];
+    if (bytes === 0) return "0 B";
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i];
+  };
+
+  const getFileIcon = () => {
+    if (isImage) return "🖼️";
+    if (isVideo) return "🎥";
+    if (isAudio) return "🎵";
+    if (isText) return "📄";
+    return "📁";
+  };
 
   const handleDownload = async () => {
     if (!url) return toast.error("No download URL available");
@@ -108,62 +154,151 @@ export default function FileTrash() {
   };
 
   return (
-    <div className="w-full p-6 bg-white border border-gray-100 rounded-md">
-      <div className="mb-3">
-        <h3 className="text-base font-medium text-gray-800">File</h3>
-        <p className="text-xs text-gray-500">{name}</p>
-      </div>
-
-      <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="col-span-2">
-          <p className="text-sm text-gray-600">
-            Type: <span className="text-gray-800">{type}</span>
-          </p>
-          <p className="text-sm text-gray-600">
-            Size: <span className="text-gray-800">{size}</span>
-          </p>
-        </div>
-
-        <div className="flex items-center justify-end space-x-2">
-          {isImage && url ? (
+    <div className="space-y-6">
+      {/* File Preview */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        {isImage && url ? (
+          <div className="aspect-video bg-gray-50 flex items-center justify-center">
             <img
               src={url}
               alt={name}
-              className="max-h-40 object-contain rounded border border-gray-100"
+              className="max-w-full max-h-full object-contain"
             />
-          ) : (
-            <div className="text-sm text-gray-600">Preview not available</div>
-          )}
+          </div>
+        ) : isVideo && url ? (
+          <div className="aspect-video bg-gray-50">
+            <video
+              src={url}
+              controls
+              className="w-full h-full"
+              preload="metadata"
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        ) : isAudio && url ? (
+          <div className="p-12 bg-gray-50">
+            <div className="text-center mb-6">
+              <div className="text-4xl text-gray-300 mb-4">🎵</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{name}</h3>
+            </div>
+            <audio src={url} controls className="w-full" preload="metadata">
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        ) : (
+          <div className="p-12 bg-gray-50 text-center">
+            <div className="text-4xl text-gray-300 mb-4">{getFileIcon()}</div>
+            <p className="text-sm text-gray-600">Preview not available</p>
+          </div>
+        )}
+      </div>
+
+      {/* File Details */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="flex items-start space-x-4">
+          <div className="shrink-0">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-xl">
+              {getFileIcon()}
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-medium text-gray-900 truncate mb-2">
+              {name}
+            </h3>
+            <div className="space-y-1">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Type:</span> {type}
+              </p>
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Size:</span>{" "}
+                {formatFileSize(size)}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center space-x-3">
-        <button
-          onClick={handleDownload}
-          className="px-3 py-2 text-sm bg-gray-800 text-white rounded hover:opacity-90"
-          disabled={!url || isDownloading}
-        >
-          {isDownloading ? "Downloading..." : "Download"}
-        </button>
+      {/* Actions */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleDownload}
+            disabled={!url || isDownloading}
+            className={`px-6 py-2 text-sm font-medium rounded-lg transition-colors ${
+              !url || isDownloading
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "bg-gray-900 text-white hover:bg-gray-800"
+            }`}
+          >
+            {isDownloading ? (
+              <span className="flex items-center space-x-2">
+                <svg
+                  className="animate-spin w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <span>Downloading...</span>
+              </span>
+            ) : (
+              <span className="flex items-center space-x-2">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                <span>Download</span>
+              </span>
+            )}
+          </button>
 
-        <button
-          onClick={() => navigate(-1)}
-          className="px-3 py-2 text-sm border border-gray-200 text-gray-700 rounded"
-        >
-          BACK
-        </button>
-      </div>
-
-      {downloadProgress !== null && (
-        <div className="mt-4 w-full bg-gray-100 rounded h-2">
-          <div
-            className="h-2 bg-gray-800 rounded"
-            style={{
-              width: `${Math.max(0, Math.min(100, downloadProgress))}%`,
-            }}
-          />
+          <button
+            onClick={() => navigate("/")}
+            className="px-6 py-2 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Create New
+          </button>
         </div>
-      )}
+
+        {downloadProgress !== null && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+              <span>Downloading...</span>
+              <span>{downloadProgress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1">
+              <div
+                className="bg-gray-900 h-1 rounded-full transition-all duration-300"
+                style={{
+                  width: `${Math.max(0, Math.min(100, downloadProgress))}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

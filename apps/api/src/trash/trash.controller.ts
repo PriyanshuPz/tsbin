@@ -171,7 +171,6 @@ export class TrashController {
   async streamFileChunks(
     @Query('trash_id') trashId: string,
     @Query('file_id') fileId: string | undefined,
-    @Query('passcode') passcode: string | undefined,
     @Res({ passthrough: false }) res: Response,
   ) {
     const startTime = Date.now();
@@ -213,18 +212,6 @@ export class TrashController {
         return res.status(400).json({
           success: false,
           message: 'Not a file type',
-          data: null,
-        });
-      }
-
-      // Check encryption and passcode
-      if (
-        trashData.encrypted &&
-        (!passcode || trashData.passcodeHash !== passcode)
-      ) {
-        return res.status(403).json({
-          success: false,
-          message: 'Invalid or missing passcode for encrypted file',
           data: null,
         });
       }

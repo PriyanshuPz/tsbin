@@ -1,59 +1,49 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import type { DragEvent, ChangeEvent } from "react";
 import { sendTrash } from "../lib/apis";
+
 interface MainBinProps {}
 
 interface FilePreview {
   file: File;
-  id: string;
   type: "text" | "image" | "video" | "audio" | "other";
   preview?: string;
+  size: string;
+}
+
+interface FormData {
+  textContent: string;
+  passcode?: string;
+  expireAt?: string;
 }
 
 export default function MainBin({}: MainBinProps) {
   const navigate = useNavigate();
-  const [textContent, setTextContent] = useState("");
-  const [selectedFiles, setSelectedFiles] = useState<FilePreview[]>([]);
+  const [selectedFile, setSelectedFile] = useState<FilePreview | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [passcode, setPasscode] = useState("");
-  const [expireAt, setExpireAt] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [errors, setErrors] = useState<{
-    passcode?: string;
-    expireAt?: string;
-  }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const validatePasscode = (value: string) => {
-    if (value && (value.length < 4 || value.length > 32)) {
-      return "Passcode must be between 4 and 32 characters";
-    }
-    return "";
-  };
+  const {
+    register,
+    handleSubmit: onSubmit,
+    watch,
+    formState: { errors },
+    reset,
+  } = useForm<FormData>({
+    defaultValues: {
+      textContent: "",
+      passcode: "",
+      expireAt: "",
+    },
+  });
 
-  const validateExpireAt = (value: string) => {
-    if (value && new Date(value) <= new Date()) {
-      return "Expiration date must be in the future";
-    }
-    return "";
-  };
-
-  const handlePasscodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setPasscode(value);
-    setErrors((prev) => ({ ...prev, passcode: validatePasscode(value) }));
-  };
-
-  const handleExpireAtChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setExpireAt(value);
-    setErrors((prev) => ({ ...prev, expireAt: validateExpireAt(value) }));
-  };
+  const textContent = watch("textContent");
 
   const getFileType = (file: File): FilePreview["type"] => {
     if (file.type.startsWith("image/")) return "image";
@@ -63,12 +53,19 @@ export default function MainBin({}: MainBinProps) {
     return "other";
   };
 
+  const formatFileSize = (bytes: number): string => {
+    const sizes = ["B", "KB", "MB", "GB"];
+    if (bytes === 0) return "0 B";
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i];
+  };
+
   const createFilePreview = (file: File): FilePreview => {
     const fileType = getFileType(file);
     const filePreview: FilePreview = {
       file,
-      id: Math.random().toString(36).substr(2, 9),
       type: fileType,
+      size: formatFileSize(file.size),
     };
 
     // Create preview for images
@@ -80,46 +77,18 @@ export default function MainBin({}: MainBinProps) {
   };
 
   const handleFiles = (files: FileList | null) => {
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    // Support up to 3 files for better stability
-    if (selectedFiles.length + files.length > 3) {
-      toast.error("You can upload up to 3 files at a time.");
+    const file = files[0]; // Only accept one file
+
+    // Check file size limit (100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 100MB.");
       return;
     }
 
-    // Check individual file size limit (100MB per file)
-    for (const file of files) {
-      if (file.size > 100 * 1024 * 1024) {
-        toast.error(
-          `File "${file.name}" is too large. Maximum size is 100MB per file.`
-        );
-        return;
-      }
-    }
-
-    // Support up to 300MB total
-    const totalSize =
-      selectedFiles.reduce((acc, f) => acc + f.file.size, 0) +
-      Array.from(files).reduce((acc, f) => acc + f.size, 0);
-    if (totalSize > 300 * 1024 * 1024) {
-      toast.error("Total file size cannot exceed 300MB.");
-      return;
-    }
-
-    // support extensions: images, and text for now
-    for (const file of files) {
-      const fileType = getFileType(file);
-      if (!["image", "text", "video", "audio", "other"].includes(fileType)) {
-        toast.error(
-          `File type not supported: ${file.name}. Only images, text, video, audio, and other files are allowed.`
-        );
-        return;
-      }
-    }
-
-    const newFiles = Array.from(files).map(createFilePreview);
-    setSelectedFiles((prev) => [...prev, ...newFiles]);
+    const filePreview = createFilePreview(file);
+    setSelectedFile(filePreview);
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -142,32 +111,30 @@ export default function MainBin({}: MainBinProps) {
     handleFiles(e.target.files);
   };
 
-  const removeFile = (id: string) => {
-    setSelectedFiles((prev) => {
-      const updated = prev.filter((f) => f.id !== id);
-      // Clean up object URLs to prevent memory leaks
-      const fileToRemove = prev.find((f) => f.id === id);
-      if (fileToRemove?.preview) {
-        URL.revokeObjectURL(fileToRemove.preview);
-      }
-      return updated;
-    });
+  const removeFile = () => {
+    if (selectedFile?.preview) {
+      URL.revokeObjectURL(selectedFile.preview);
+    }
+    setSelectedFile(null);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (data: FormData) => {
     if (isSubmitting) return;
 
-    if (!textContent.trim() && selectedFiles.length === 0) {
-      toast.error("Please enter some text or select files to upload.");
+    if (!data.textContent.trim() && !selectedFile) {
+      toast.error("Please enter some text or select a file to upload.");
       return;
     }
 
-    if (passcode && (passcode.length < 4 || passcode.length > 32)) {
+    if (
+      data.passcode &&
+      (data.passcode.length < 4 || data.passcode.length > 32)
+    ) {
       toast.error("Passcode must be between 4 and 32 characters.");
       return;
     }
 
-    if (expireAt && new Date(expireAt) <= new Date()) {
+    if (data.expireAt && new Date(data.expireAt) <= new Date()) {
       toast.error("Expiration date must be in the future.");
       return;
     }
@@ -185,29 +152,28 @@ export default function MainBin({}: MainBinProps) {
       });
     }, 400) as unknown as number;
 
-    // Show loading toast
     const loadingToast = toast.loading("Creating your trash...");
 
     try {
-      const hasText = textContent.trim().length > 0;
-      const hasFiles = selectedFiles.length > 0;
+      const hasText = data.textContent.trim().length > 0;
+      const hasFile = selectedFile !== null;
 
       let result;
 
-      if (hasFiles) {
+      if (hasFile) {
         result = await sendTrash({
           type: "file",
-          textContent: hasText ? textContent : undefined,
-          files: selectedFiles.map((f) => f.file),
-          passcode: passcode || undefined,
-          expireAt: expireAt ? new Date(expireAt) : undefined,
+          textContent: hasText ? data.textContent : undefined,
+          files: [selectedFile.file],
+          passcode: data.passcode || undefined,
+          expireAt: data.expireAt ? new Date(data.expireAt) : undefined,
         });
       } else if (hasText) {
         result = await sendTrash({
           type: "text",
-          textContent,
-          passcode: passcode || undefined,
-          expireAt: expireAt ? new Date(expireAt) : undefined,
+          textContent: data.textContent,
+          passcode: data.passcode || undefined,
+          expireAt: data.expireAt ? new Date(data.expireAt) : undefined,
         });
       }
 
@@ -217,10 +183,8 @@ export default function MainBin({}: MainBinProps) {
         setUploadProgress(100);
         toast.success("Trash created successfully! Redirecting...");
 
-        setTextContent("");
-        setSelectedFiles([]);
-        setPasscode("");
-        setExpireAt("");
+        reset();
+        setSelectedFile(null);
 
         setTimeout(() => {
           navigate(`/t/${result.data}`);
@@ -236,7 +200,6 @@ export default function MainBin({}: MainBinProps) {
       toast.error("An error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
-      // Reset progress after a short delay
       setTimeout(() => setUploadProgress(null), 600);
       if (progressInterval) window.clearInterval(progressInterval);
     }
@@ -246,386 +209,308 @@ export default function MainBin({}: MainBinProps) {
     fileInputRef.current?.click();
   };
 
-  return (
-    <div /*className="min-h-screen bg-white"*/>
-      <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl sm:text-5xl font-light text-gray-900 mb-4">
-            tsbin
-          </h1>
-          <p className="text-lg text-gray-600 font-light max-w-2xl mx-auto">
-            A simple place to store and share your text, files, and media.
-            <br /> No signup required. Upload up to 3 files (100MB each, 300MB
-            total).
-          </p>
+  const getFileIcon = (type: FilePreview["type"]) => {
+    switch (type) {
+      case "image":
+        return "🖼️";
+      case "video":
+        return "🎥";
+      case "audio":
+        return "🎵";
+      case "text":
+        return "📄";
+      default:
+        return "📁";
+    }
+  };
 
-          {/* Open Source Banner */}
-          <div className="mt-6 inline-flex items-center space-x-4 text-sm text-gray-500">
-            <span className="flex items-center space-x-1">
-              <span>Open Source</span>
-            </span>
-            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-            <span className="flex items-center space-x-1">
-              <span>End-to-End Encrypted</span>
-            </span>
-            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-            <span className="flex items-center space-x-1">
-              <span>No Registration</span>
-            </span>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-2xl mx-auto px-6 py-6">
+          <div className="text-center">
+            <h1 className="text-3xl font-thin text-gray-900 tracking-wide">
+              tsbin
+            </h1>
+            <p className="text-sm text-gray-500 mt-2 font-light">
+              Secure temporary file sharing
+            </p>
           </div>
         </div>
+      </div>
 
-        <div className="mb-8">
+      {/* Main Content */}
+      <div className="max-w-2xl mx-auto px-6 py-8">
+        <form onSubmit={onSubmit(handleSubmit)} className="space-y-6">
+          {/* Text Area */}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div className="p-1">
+              <textarea
+                {...register("textContent")}
+                placeholder="Enter your text here..."
+                className="w-full h-48 p-4 bg-transparent border-none outline-none resize-none text-gray-800 placeholder-gray-400 text-sm leading-relaxed font-mono"
+              />
+            </div>
+          </div>
+
+          {/* File Drop Zone */}
           <div
-            className={`relative bg-gray-50 border-2 border-dashed rounded-xl p-8 transition-all duration-200 ease-in-out ${
+            className={`relative bg-white rounded-lg border-2 border-dashed transition-all duration-200 ${
               isDragOver
-                ? "border-gray-400 bg-gray-100"
+                ? "border-gray-400 bg-gray-50"
                 : "border-gray-200 hover:border-gray-300"
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <textarea
-              value={textContent}
-              onChange={(e) => setTextContent(e.target.value)}
-              placeholder="Paste your text here, or drag and drop files..."
-              className="w-full h-64 bg-transparent border-none outline-none resize-none text-gray-800 placeholder-gray-400 text-base leading-relaxed"
-            />
+            {selectedFile ? (
+              /* File Preview */
+              <div className="p-6">
+                <div className="flex items-start space-x-4">
+                  <div className="shrink-0">
+                    {selectedFile.type === "image" && selectedFile.preview ? (
+                      <img
+                        src={selectedFile.preview}
+                        alt={selectedFile.file.name}
+                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-2xl">
+                        {getFileIcon(selectedFile.type)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-medium text-gray-900 truncate">
+                      {selectedFile.file.name}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {selectedFile.size} • {selectedFile.type}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeFile}
+                    className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Drop Zone */
+              <div className="p-12 text-center">
+                <div className="text-4xl text-gray-300 mb-4">📁</div>
+                <p className="text-sm text-gray-500 mb-2">
+                  Drop a file here, or{" "}
+                  <button
+                    type="button"
+                    onClick={openFileDialog}
+                    className="text-gray-700 underline underline-offset-2 hover:text-gray-900"
+                  >
+                    browse
+                  </button>
+                </p>
+                <p className="text-xs text-gray-400">One file, up to 100MB</p>
+              </div>
+            )}
 
             {isDragOver && (
-              <div className="absolute inset-0 bg-gray-100 bg-opacity-90 border-2 border-dashed border-gray-400 rounded-xl flex items-center justify-center">
+              <div className="absolute inset-0 bg-gray-50 bg-opacity-90 border-2 border-dashed border-gray-400 rounded-lg flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-4xl mb-2 text-gray-600">Drop Files</div>
-                  <p className="text-gray-600 font-medium">
-                    Drop your files here
+                  <div className="text-3xl text-gray-500 mb-2">📎</div>
+                  <p className="text-sm text-gray-600 font-medium">
+                    Drop your file here
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="mt-4 flex justify-center">
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileSelect}
+            className="hidden"
+            accept="*/*"
+          />
+
+          {/* Advanced Options */}
+          <div className="bg-white rounded-lg border border-gray-200">
             <button
-              onClick={openFileDialog}
-              className="text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors duration-200"
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full px-4 py-3 text-left flex items-center justify-between text-sm text-gray-700 hover:bg-gray-50 transition-colors rounded-lg"
             >
-              Or click to select files
+              <span className="font-medium">Advanced Options</span>
+              <svg
+                className={`w-4 h-4 transition-transform ${
+                  showAdvanced ? "rotate-180" : ""
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-              accept="*/*"
-            />
+
+            {showAdvanced && (
+              <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
+                {/* Passcode */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
+                    Passcode (Optional)
+                  </label>
+                  <input
+                    {...register("passcode", {
+                      minLength: {
+                        value: 4,
+                        message: "Passcode must be at least 4 characters",
+                      },
+                      maxLength: {
+                        value: 32,
+                        message: "Passcode must be at most 32 characters",
+                      },
+                    })}
+                    type="password"
+                    placeholder="Default: 0000"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                  />
+                  {errors.passcode && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.passcode.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Expiration */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">
+                    Expiration (Optional)
+                  </label>
+                  <input
+                    {...register("expireAt", {
+                      validate: (value) => {
+                        if (!value) return true;
+                        return (
+                          new Date(value) > new Date() ||
+                          "Expiration must be in the future"
+                        );
+                      },
+                    })}
+                    type="datetime-local"
+                    min={new Date().toISOString().slice(0, 16)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                  />
+                  {errors.expireAt && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.expireAt.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
 
-        <div className="mb-8">
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center text-gray-600 hover:text-gray-800 text-sm font-medium transition-colors duration-200"
-          >
-            <span className="mr-2">{showAdvanced ? "−" : "+"}</span>
-            Advanced Options (Optional)
-          </button>
-
-          {showAdvanced && (
-            <div className="mt-4 space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div>
-                <label
-                  htmlFor="passcode"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Passcode (for extra security)
-                </label>
-                <input
-                  id="passcode"
-                  type="password"
-                  value={passcode}
-                  onChange={handlePasscodeChange}
-                  minLength={4}
-                  maxLength={32}
-                  placeholder="Leave empty for default (0000)"
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200 ${
-                    errors.passcode
-                      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:border-blue-500"
-                  }`}
-                />
-                {errors.passcode && (
-                  <p className="mt-1 text-xs text-red-500">{errors.passcode}</p>
-                )}
-                {!errors.passcode && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Used to encrypt your content. Default is "0000" if left
-                    empty.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="expireAt"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Expiration Date
-                </label>
-                <input
-                  id="expireAt"
-                  type="datetime-local"
-                  value={expireAt}
-                  onChange={handleExpireAtChange}
-                  min={new Date().toISOString().slice(0, 16)}
-                  className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 transition-colors duration-200 ${
-                    errors.expireAt
-                      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  }`}
-                />
-                {errors.expireAt && (
-                  <p className="mt-1 text-xs text-red-500">{errors.expireAt}</p>
-                )}
-                {!errors.expireAt && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Leave empty for no expiration. Content will be automatically
-                    deleted after this date.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {selectedFiles.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">
-              Selected Files ({selectedFiles.length})
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedFiles.map((filePreview) => (
-                <div
-                  key={filePreview.id}
-                  className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      {filePreview.type === "image" && filePreview.preview && (
-                        <img
-                          src={filePreview.preview}
-                          alt={filePreview.file.name}
-                          className="w-full h-32 object-cover rounded-md mb-3"
-                        />
-                      )}
-                      <h4 className="text-sm font-medium text-gray-800 truncate">
-                        {filePreview.file.name}
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {(filePreview.file.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                      <div className="flex items-center mt-2">
-                        <span className="text-xs text-gray-400 uppercase tracking-wide">
-                          {filePreview.type}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeFile(filePreview.id)}
-                      className="ml-2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                    >
-                      ×
-                    </button>
+          {/* Upload Progress */}
+          {uploadProgress !== null && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                    <span>Uploading...</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1">
+                    <div
+                      className="bg-gray-900 h-1 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="text-center">
-          {uploadProgress !== null && (
-            <div className="mb-4 max-w-xl mx-auto">
-              <div className="w-full bg-gray-100 rounded h-2 overflow-hidden">
-                <div
-                  className="h-2 bg-gray-800 rounded transition-all duration-300"
-                  style={{
-                    width: `${Math.max(0, Math.min(100, uploadProgress))}%`,
-                  }}
-                />
-              </div>
-              <div className="text-xs text-gray-500 mt-2">
-                Uploading — {uploadProgress}%
               </div>
             </div>
           )}
 
-          <button
-            onClick={handleSubmit}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            disabled={
-              (!textContent.trim() && selectedFiles.length === 0) ||
-              isSubmitting
-            }
-            className={`inline-flex items-center px-8 py-3 text-base font-medium rounded-lg shadow-sm transition-all duration-200 ease-in-out transform ${
-              (textContent.trim() || selectedFiles.length > 0) && !isSubmitting
-                ? isHovered
-                  ? "bg-gray-900 text-white shadow-lg scale-105"
-                  : "bg-gray-100 text-gray-900 hover:bg-gray-200"
-                : "bg-gray-50 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            {isSubmitting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-                Creating...
-              </>
-            ) : (
-              "Create"
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Simple Footer Section */}
-      <div className="bg-gray-50 border-t border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-light text-gray-800 mb-4">
-              Roadmap & Open Source
-            </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              tsbin is actively being developed with exciting features planned.
-              Join our community and help shape the future!
-            </p>
+          {/* Submit Button */}
+          <div className="text-center">
+            <button
+              type="submit"
+              disabled={(!textContent?.trim() && !selectedFile) || isSubmitting}
+              className={`px-8 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                (!textContent?.trim() && !selectedFile) || isSubmitting
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-950 shadow-sm hover:shadow"
+              }`}
+            >
+              {isSubmitting ? (
+                <span className="flex items-center space-x-2">
+                  <svg
+                    className="animate-spin w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span>Creating...</span>
+                </span>
+              ) : (
+                "Create Bin"
+              )}
+            </button>
           </div>
+        </form>
 
-          <div className="grid md:grid-cols-2 gap-8 mb-8">
-            {/* Current Features */}
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-800 mb-4">
-                Current Features
-              </h3>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
-                  End-to-end encryption (AES-GCM)
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
-                  Text and file sharing
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
-                  Custom passcode protection
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
-                  Expiration dates
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
-                  Image preview & file downloads
-                </li>
-              </ul>
-            </div>
-
-            {/* Upcoming Features */}
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-800 mb-4">
-                Coming Soon
-              </h3>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
-                  Larger file support (chunked uploads)
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
-                  Video/audio preview players
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
-                  Batch file operations
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
-                  API endpoints for developers
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
-                  Mobile app (React Native)
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Contribution Section */}
-          <div className="bg-gray-100 rounded-lg p-6 border border-gray-200">
+        {/* Features */}
+        <div className="mt-12 text-center">
+          <div className="grid grid-cols-3 gap-6 max-w-md mx-auto">
             <div className="text-center">
-              <h3 className="text-lg font-medium text-gray-800 mb-3">
-                Open Source & Community
-              </h3>
-              <p className="text-gray-600 mb-4 max-w-2xl mx-auto">
-                tsbin is completely open source! We welcome contributions, bug
-                reports, and feature requests from the community.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
-                <a
-                  href="https://github.com/PriyanshuPz/tsbin"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors duration-200 text-sm font-medium"
-                >
-                  Star on GitHub
-                </a>
-
-                <a
-                  href="https://github.com/PriyanshuPz/tsbin/fork"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium"
-                >
-                  Fork & Contribute
-                </a>
-
-                <a
-                  href="https://github.com/PriyanshuPz/tsbin/issues"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500 transition-colors duration-200 text-sm font-medium"
-                >
-                  Report Issues
-                </a>
-              </div>
-
-              <div className="mt-4 text-xs text-gray-500">
-                <p>Built with React, NestJS, and modern encryption</p>
-              </div>
+              <div className="text-lg text-gray-400 mb-2">🔒</div>
+              <p className="text-xs text-gray-600 font-medium">Encrypted</p>
             </div>
-          </div>
-
-          {/* Tech Stack */}
-          <div className="mt-8 text-center">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">
-              Tech Stack
-            </h4>
-            <div className="flex flex-wrap justify-center items-center space-x-6 text-xs text-gray-500">
-              <span>React</span>
-              <span>NestJS</span>
-              <span>Telegram</span>
-              <span>Appwrite</span>
+            <div className="text-center">
+              <div className="text-lg text-gray-400 mb-2">⚡</div>
+              <p className="text-xs text-gray-600 font-medium">Fast</p>
+            </div>
+            <div className="text-center">
+              <div className="text-lg text-gray-400 mb-2">🚫</div>
+              <p className="text-xs text-gray-600 font-medium">No signup</p>
             </div>
           </div>
         </div>
       </div>
-
-      {/*<footer className="text-center py-8 border-t border-gray-100">
-        <p className="text-xs text-gray-400">powered by tsbin</p>
-      </footer>*/}
     </div>
   );
 }
