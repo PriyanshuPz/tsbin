@@ -101,7 +101,7 @@ export const useFileTrashContent = () =>
         const ts = new TsbinController(SITE_CONFIG.API_URL, "");
 
         // returns buffer
-        const buffer = await ts.decrypt_file(
+        const obj = await ts.decrypt_file(
           id,
           passcode,
           (progress: UploadProgress) => {
@@ -109,16 +109,16 @@ export const useFileTrashContent = () =>
           }
         );
 
-        const arrayBuffer = buffer.buffer as ArrayBuffer;
+        const arrayBuffer = obj.file.buffer as ArrayBuffer;
         const blob = new Blob([arrayBuffer], {
           type: "application/octet-stream",
         });
 
         return {
           id: id,
-          fileName: `decrypted_file_${id.slice(0, 8)}`,
-          fileSize: `${buffer.length} bytes`,
-          fileType: "application/octet-stream",
+          fileName: obj.file_name,
+          fileSize: obj.file_size.toString(),
+          fileType: obj.mime_type,
           downloadUrl: URL.createObjectURL(blob),
           fileData: arrayBuffer,
         } as FileTrashContent;

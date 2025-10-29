@@ -3,6 +3,16 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileTrashContent {
+    pub id: String,
+    pub mime_type: String,
+    pub file: Vec<u8>,
+    pub file_name: String,
+    pub file_size: usize,
+}
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextTrashContent {
     pub id: String,
     pub enc_trash_text: String,
@@ -66,6 +76,10 @@ pub struct TrashMeta {
     pub message_ids: Option<Vec<u64>>,
     pub total_chunks: Option<u32>,
     pub total_size: Option<u64>,
+
+    pub file_name: String,
+    pub mime_type: String,
+    pub file_size: usize,
 }
 
 #[wasm_bindgen(getter_with_clone)]

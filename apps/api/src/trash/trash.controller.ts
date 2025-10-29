@@ -120,6 +120,10 @@ export class TrashController {
           message_ids: trashContent.message_ids,
           total_chunks: trashContent.total_chunks,
           total_size: trashContent.file_size,
+
+          file_name: trashContent.original_name,
+          mime_type: trashContent.mime_type,
+          file_size: trashContent.file_size,
         },
       };
     } catch (error) {

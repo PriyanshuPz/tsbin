@@ -186,7 +186,8 @@ impl TsbinController {
             "total_chunks": total_chunks,
             "chunk_size": chunk_size,
             "encryption_type": "aes256gcm",
-            "filename": file.name()
+            "filename": file.name(),
+            "mime_type": file.type_(),
         });
 
         let trash_id = self
@@ -213,7 +214,7 @@ impl TsbinController {
         trash_id: String,
         passcode: String,
         progress_callback: Option<js_sys::Function>,
-    ) -> Result<Uint8Array, JsValue> {
+    ) -> Result<FileTrashContent, JsValue> {
         // Get trash metadata
         let trash_meta = self.client.get_file_trash_meta(&trash_id).await?;
 
@@ -274,6 +275,12 @@ impl TsbinController {
             callback.call1(&JsValue::null(), &progress_js)?;
         }
 
-        Ok(Uint8Array::from(&final_data[..]))
+        Ok(FileTrashContent {
+            id: trash_id,
+            file: final_data,
+            mime_type: trash_meta.mime_type.clone(),
+            file_name: trash_meta.file_name.clone(),
+            file_size: trash_meta.file_size,
+        })
     }
 }

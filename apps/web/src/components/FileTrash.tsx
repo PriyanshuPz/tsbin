@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTrashContext } from "../context/useTrashContext";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 export default function FileTrash() {
   const {
@@ -13,7 +14,7 @@ export default function FileTrash() {
 
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-
+  const navigate = useNavigate();
   if (isLoadingTrash || isLoadingContent) {
     return <div className="w-full p-6 text-sm text-gray-600">Loading...</div>;
   }
@@ -146,10 +147,10 @@ export default function FileTrash() {
         </button>
 
         <button
-          onClick={() => toast("No actions available", { icon: "ℹ️" })}
+          onClick={() => navigate(-1)}
           className="px-3 py-2 text-sm border border-gray-200 text-gray-700 rounded"
         >
-          Close
+          BACK
         </button>
       </div>
 

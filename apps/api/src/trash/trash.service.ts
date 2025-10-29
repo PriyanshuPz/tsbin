@@ -82,6 +82,8 @@ export class TrashService {
               encryption_type: encryption_metadata.encryption_type,
               message_ids,
               original_name: encryption_metadata.filename,
+              mime_type:
+                encryption_metadata.mime_type || 'application/octet-stream',
             },
           },
         },

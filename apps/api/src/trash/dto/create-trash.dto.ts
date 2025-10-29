@@ -56,5 +56,6 @@ export class CreateFileTrashDto {
     chunk_size: number;
     encryption_type: string;
     filename: string;
+    mime_type?: string;
   };
 }

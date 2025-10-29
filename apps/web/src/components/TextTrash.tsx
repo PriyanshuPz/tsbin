@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useTrashContext } from "../context/useTrashContext";
 import toast from "react-hot-toast";
 
@@ -9,7 +10,7 @@ export default function TextTrash() {
     errorLoadingTrash,
     errorLoadingContent,
   } = useTrashContext();
-
+  const navigate = useNavigate();
   if (isLoadingTrash || isLoadingContent) {
     return <div className="w-full p-6 text-sm text-gray-600">Loading...</div>;
   }
@@ -61,10 +62,10 @@ export default function TextTrash() {
           Copy
         </button>
         <button
-          onClick={() => toast("No actions available", { icon: "ℹ️" })}
+          onClick={() => navigate(-1)}
           className="px-3 py-2 text-sm border border-gray-200 text-gray-700 rounded"
         >
-          Close
+          BACK
         </button>
       </div>
     </div>
