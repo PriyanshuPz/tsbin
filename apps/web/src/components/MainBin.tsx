@@ -21,6 +21,7 @@ export default function MainBin({}: MainBinProps) {
   const [passcode, setPasscode] = useState("");
   const [expireAt, setExpireAt] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [errors, setErrors] = useState<{
     passcode?: string;
@@ -172,6 +173,17 @@ export default function MainBin({}: MainBinProps) {
     }
 
     setIsSubmitting(true);
+    setUploadProgress(0);
+
+    // Simulate upload progress
+    let progressInterval: number | undefined;
+    progressInterval = window.setInterval(() => {
+      setUploadProgress((p) => {
+        if (p === null) return 5;
+        const next = Math.min(90, p + Math.random() * 12);
+        return Math.round(next);
+      });
+    }, 400) as unknown as number;
 
     // Show loading toast
     const loadingToast = toast.loading("Creating your trash...");
@@ -202,6 +214,7 @@ export default function MainBin({}: MainBinProps) {
       toast.dismiss(loadingToast);
 
       if (result?.success) {
+        setUploadProgress(100);
         toast.success("Trash created successfully! Redirecting...");
 
         setTextContent("");
@@ -211,7 +224,7 @@ export default function MainBin({}: MainBinProps) {
 
         setTimeout(() => {
           navigate(`/t/${result.data}`);
-        }, 1000);
+        }, 900);
       } else {
         toast.error(
           result?.message || "Failed to create trash. Please try again."
@@ -223,6 +236,9 @@ export default function MainBin({}: MainBinProps) {
       toast.error("An error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
+      // Reset progress after a short delay
+      setTimeout(() => setUploadProgress(null), 600);
+      if (progressInterval) window.clearInterval(progressInterval);
     }
   };
 
@@ -234,29 +250,26 @@ export default function MainBin({}: MainBinProps) {
     <div /*className="min-h-screen bg-white"*/>
       <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h1 className="text-4xl sm:text-5xl font-light text-gray-800 mb-4">
+          <h1 className="text-4xl sm:text-5xl font-light text-gray-900 mb-4">
             tsbin
           </h1>
           <p className="text-lg text-gray-600 font-light max-w-2xl mx-auto">
             A simple place to store and share your text, files, and media.
-            <br /> No signup required. Upload up to 3 files (20MB each, 30MB
+            <br /> No signup required. Upload up to 3 files (100MB each, 300MB
             total).
           </p>
 
           {/* Open Source Banner */}
           <div className="mt-6 inline-flex items-center space-x-4 text-sm text-gray-500">
             <span className="flex items-center space-x-1">
-              <span>⭐</span>
               <span>Open Source</span>
             </span>
             <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
             <span className="flex items-center space-x-1">
-              <span>🔒</span>
               <span>End-to-End Encrypted</span>
             </span>
             <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
             <span className="flex items-center space-x-1">
-              <span>🚀</span>
               <span>No Registration</span>
             </span>
           </div>
@@ -266,7 +279,7 @@ export default function MainBin({}: MainBinProps) {
           <div
             className={`relative bg-gray-50 border-2 border-dashed rounded-xl p-8 transition-all duration-200 ease-in-out ${
               isDragOver
-                ? "border-blue-400 bg-blue-50"
+                ? "border-gray-400 bg-gray-100"
                 : "border-gray-200 hover:border-gray-300"
             }`}
             onDragOver={handleDragOver}
@@ -281,10 +294,10 @@ export default function MainBin({}: MainBinProps) {
             />
 
             {isDragOver && (
-              <div className="absolute inset-0 bg-blue-50 bg-opacity-90 border-2 border-dashed border-blue-400 rounded-xl flex items-center justify-center">
+              <div className="absolute inset-0 bg-gray-100 bg-opacity-90 border-2 border-dashed border-gray-400 rounded-xl flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-4xl mb-2">📁</div>
-                  <p className="text-blue-600 font-medium">
+                  <div className="text-4xl mb-2 text-gray-600">Drop Files</div>
+                  <p className="text-gray-600 font-medium">
                     Drop your files here
                   </p>
                 </div>
@@ -420,9 +433,9 @@ export default function MainBin({}: MainBinProps) {
                     </div>
                     <button
                       onClick={() => removeFile(filePreview.id)}
-                      className="ml-2 text-gray-400 hover:text-red-500 transition-colors duration-200"
+                      className="ml-2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
                     >
-                      ✕
+                      ×
                     </button>
                   </div>
                 </div>
@@ -432,6 +445,22 @@ export default function MainBin({}: MainBinProps) {
         )}
 
         <div className="text-center">
+          {uploadProgress !== null && (
+            <div className="mb-4 max-w-xl mx-auto">
+              <div className="w-full bg-gray-100 rounded h-2 overflow-hidden">
+                <div
+                  className="h-2 bg-gray-800 rounded transition-all duration-300"
+                  style={{
+                    width: `${Math.max(0, Math.min(100, uploadProgress))}%`,
+                  }}
+                />
+              </div>
+              <div className="text-xs text-gray-500 mt-2">
+                Uploading — {uploadProgress}%
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleSubmit}
             onMouseEnter={() => setIsHovered(true)}
@@ -443,8 +472,8 @@ export default function MainBin({}: MainBinProps) {
             className={`inline-flex items-center px-8 py-3 text-base font-medium rounded-lg shadow-sm transition-all duration-200 ease-in-out transform ${
               (textContent.trim() || selectedFiles.length > 0) && !isSubmitting
                 ? isHovered
-                  ? "bg-blue-500 text-white shadow-lg scale-105"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-gray-900 text-white shadow-lg scale-105"
+                  : "bg-gray-100 text-gray-900 hover:bg-gray-200"
                 : "bg-gray-50 text-gray-400 cursor-not-allowed"
             }`}
           >
@@ -454,21 +483,18 @@ export default function MainBin({}: MainBinProps) {
                 Creating...
               </>
             ) : (
-              <>
-                <span className="mr-2">🗑️</span>
-                Add to Trashbin
-              </>
+              "Create"
             )}
           </button>
         </div>
       </div>
 
-      {/* Roadmap & Contribution Section */}
+      {/* Simple Footer Section */}
       <div className="bg-gray-50 border-t border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-light text-gray-800 mb-4">
-              🚀 Roadmap & Open Source
+              Roadmap & Open Source
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
               tsbin is actively being developed with exciting features planned.
@@ -479,78 +505,68 @@ export default function MainBin({}: MainBinProps) {
           <div className="grid md:grid-cols-2 gap-8 mb-8">
             {/* Current Features */}
             <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
-                <span className="mr-2">✅</span>
+              <h3 className="text-lg font-medium text-gray-800 mb-4">
                 Current Features
               </h3>
               <ul className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                   End-to-end encryption (AES-GCM)
                 </li>
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                   Text and file sharing
                 </li>
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                   Custom passcode protection
                 </li>
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                   Expiration dates
                 </li>
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                   Image preview & file downloads
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-3"></span>
-                  Rate limiting & security
                 </li>
               </ul>
             </div>
 
             {/* Upcoming Features */}
             <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
-                <span className="mr-2">🔮</span>
+              <h3 className="text-lg font-medium text-gray-800 mb-4">
                 Coming Soon
               </h3>
               <ul className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
                   Larger file support (chunked uploads)
                 </li>
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
                   Video/audio preview players
                 </li>
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
                   Batch file operations
                 </li>
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
                   API endpoints for developers
                 </li>
                 <li className="flex items-center">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
+                  <span className="w-2 h-2 bg-gray-300 rounded-full mr-3"></span>
                   Mobile app (React Native)
-                </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full mr-3"></span>
-                  Self-hosting guide
                 </li>
               </ul>
             </div>
           </div>
 
           {/* Contribution Section */}
-          <div className="bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+          <div className="bg-gray-100 rounded-lg p-6 border border-gray-200">
             <div className="text-center">
               <h3 className="text-lg font-medium text-gray-800 mb-3">
-                💻 Open Source & Community
+                Open Source & Community
               </h3>
               <p className="text-gray-600 mb-4 max-w-2xl mx-auto">
                 tsbin is completely open source! We welcome contributions, bug
@@ -564,7 +580,6 @@ export default function MainBin({}: MainBinProps) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors duration-200 text-sm font-medium"
                 >
-                  <span className="mr-2">⭐</span>
                   Star on GitHub
                 </a>
 
@@ -572,9 +587,8 @@ export default function MainBin({}: MainBinProps) {
                   href="https://github.com/PriyanshuPz/tsbin/fork"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200 text-sm font-medium"
+                  className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200 text-sm font-medium"
                 >
-                  <span className="mr-2">🍴</span>
                   Fork & Contribute
                 </a>
 
@@ -582,15 +596,14 @@ export default function MainBin({}: MainBinProps) {
                   href="https://github.com/PriyanshuPz/tsbin/issues"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors duration-200 text-sm font-medium"
+                  className="inline-flex items-center px-4 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500 transition-colors duration-200 text-sm font-medium"
                 >
-                  <span className="mr-2">🐛</span>
                   Report Issues
                 </a>
               </div>
 
               <div className="mt-4 text-xs text-gray-500">
-                <p>Built with ❤️ using React, NestJS, and modern encryption</p>
+                <p>Built with React, NestJS, and modern encryption</p>
               </div>
             </div>
           </div>
@@ -601,30 +614,10 @@ export default function MainBin({}: MainBinProps) {
               Tech Stack
             </h4>
             <div className="flex flex-wrap justify-center items-center space-x-6 text-xs text-gray-500">
-              <span className="flex items-center space-x-1">
-                <img
-                  src="https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black"
-                  alt="React"
-                />
-              </span>
-              <span className="flex items-center space-x-1">
-                <img
-                  src="https://img.shields.io/badge/NestJS-E0234E?style=flat&logo=nestjs&logoColor=white"
-                  alt="NestJS"
-                />
-              </span>
-              <span className="flex items-center space-x-1">
-                <img
-                  src="https://img.shields.io/badge/Telegram-26A5E4?style=flat&logo=telegram&logoColor=white"
-                  alt="Telegram"
-                />
-              </span>
-              <span className="flex items-center space-x-1">
-                <img
-                  src="https://img.shields.io/badge/AppWrite-E0234E?style=flat&logo=AppWrite&logoColor=white"
-                  alt="Appwrite"
-                />
-              </span>
+              <span>React</span>
+              <span>NestJS</span>
+              <span>Telegram</span>
+              <span>Appwrite</span>
             </div>
           </div>
         </div>
