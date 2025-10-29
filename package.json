@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev --parallel",
+    "dev": "turbo run dev",
     "build": "turbo run build",
     "build:wasm": "cd crates/wasm && wasm-pack build --target web --out-dir ../../packages/tsbin-wasm/",
     "lint": "turbo run lint",

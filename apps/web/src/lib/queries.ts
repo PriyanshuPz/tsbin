@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { SITE_CONFIG } from "./constants";
-import init, { TsbinController } from "tsbin-wasm";
+import init, { TsbinController, UploadProgress } from "tsbin-wasm";
 
 type TrashType = "TEXT" | "FILE";
 
-type TrashData = {
+export type TrashData = {
   expireAt: Date | null;
   slug: string;
   id: string;
@@ -47,8 +47,6 @@ export const useTextTrashContent = () =>
       return false;
     },
 
-    // queryKey: ["textTrashContent", id, passcode],
-    // enabled: !!id || !!passcode,
     mutationFn: async ({ id, passcode }: { id: string; passcode: string }) => {
       try {
         if (!id || !passcode) {
@@ -66,6 +64,66 @@ export const useTextTrashContent = () =>
         } as TextTrashContent;
       } catch (error: any) {
         console.error("Error in useTextTrashContent:", error.message);
+        throw new Error(error.message);
+      }
+    },
+  });
+
+export type FileTrashContent = {
+  id: string;
+  fileName: string;
+  fileSize: string;
+  fileType: string;
+  downloadUrl?: string;
+  previewUrl?: string;
+  fileData?: any;
+};
+
+export const useFileTrashContent = () =>
+  useMutation({
+    retry(_, error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Missing id or passcode")
+      ) {
+        return true;
+      }
+      return false;
+    },
+
+    mutationFn: async ({ id, passcode }: { id: string; passcode: string }) => {
+      try {
+        if (!id || !passcode) {
+          throw new Error("Missing id or passcode");
+        }
+
+        await init();
+        const ts = new TsbinController(SITE_CONFIG.API_URL, "");
+
+        // returns buffer
+        const buffer = await ts.decrypt_file(
+          id,
+          passcode,
+          (progress: UploadProgress) => {
+            console.log(`Decryption progress: ${progress}%`);
+          }
+        );
+
+        const arrayBuffer = buffer.buffer as ArrayBuffer;
+        const blob = new Blob([arrayBuffer], {
+          type: "application/octet-stream",
+        });
+
+        return {
+          id: id,
+          fileName: `decrypted_file_${id.slice(0, 8)}`,
+          fileSize: `${buffer.length} bytes`,
+          fileType: "application/octet-stream",
+          downloadUrl: URL.createObjectURL(blob),
+          fileData: arrayBuffer,
+        } as FileTrashContent;
+      } catch (error: any) {
+        console.error("Error in useFileTrashContent:", error);
         throw new Error(error.message);
       }
     },

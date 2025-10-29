@@ -3,7 +3,6 @@ use serde_json::json;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::console;
 use web_sys::{FormData, Headers, Request, RequestInit, RequestMode, Response};
 
 pub struct TsbinClient {
@@ -63,12 +62,6 @@ impl TsbinClient {
             return Err(JsValue::from_str(&format!("HTTP error: {}", resp.status())));
         }
 
-        console::log_1(&JsValue::from_str(&format!(
-            "Request to {} completed with status {}",
-            endpoint,
-            resp.status()
-        )));
-
         Ok(resp)
     }
 
@@ -83,7 +76,6 @@ impl TsbinClient {
             "text_length": encrypted_text.len()
         });
 
-        // Convert to JsValue using js_sys::JSON::parse instead of serde_wasm_bindgen
         let body_str =
             serde_json::to_string(&body).map_err(|e| JsValue::from_str(&e.to_string()))?;
         let body_js = js_sys::JSON::parse(&body_str)?;
@@ -94,10 +86,6 @@ impl TsbinClient {
 
         let response_text = JsFuture::from(response.text()?).await?;
 
-        console::log_1(&JsValue::from_str(&format!(
-            "Response text: {}",
-            response_text.as_string().unwrap()
-        )));
         let response_json: serde_json::Value =
             serde_json::from_str(&response_text.as_string().unwrap())
                 .map_err(|e| JsValue::from_str(&e.to_string()))?;
@@ -108,11 +96,15 @@ impl TsbinClient {
             .to_string())
     }
 
-    pub async fn get_trash_meta(&self, trash_id: &str) -> Result<TrashMeta, JsValue> {
-        let endpoint = format!("/trash?trash_id={}", trash_id);
+    pub async fn get_file_trash_meta(&self, trash_id: &str) -> Result<TrashMeta, JsValue> {
+        let endpoint = format!("/trash/file?file_id={}", trash_id);
         let response = self.make_request(&endpoint, "GET", None).await?;
         let response_text = JsFuture::from(response.text()?).await?;
-        let trash_meta: TrashMeta = serde_json::from_str(&response_text.as_string().unwrap())
+        let response_json: serde_json::Value =
+            serde_json::from_str(&response_text.as_string().unwrap())
+                .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        let trash_meta: TrashMeta = serde_json::from_str(&response_json["data"].to_string())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         Ok(trash_meta)
@@ -162,30 +154,32 @@ impl TsbinClient {
     pub async fn create_file_trash(
         &self,
         file_ids: Vec<String>,
-        message_ids: Vec<String>,
+        message_ids: Vec<u32>,
         metadata: &serde_json::Value,
     ) -> Result<String, JsValue> {
         let body = json!({
             "message_ids": message_ids,
             "file_ids": file_ids,
-            "passcode_hash": metadata.get("passcode_hash"),
-            "expire_at": metadata.get("expire_at"),
             "encryption_metadata": metadata
         });
 
+        let body_str =
+            serde_json::to_string(&body).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let body_js = js_sys::JSON::parse(&body_str)?;
+
         let response = self
-            .make_request(
-                "/trash/content",
-                "POST",
-                Some(serde_wasm_bindgen::to_value(&body)?),
-            )
+            .make_request("/trash/file", "POST", Some(body_js))
             .await?;
         let response_text = JsFuture::from(response.text()?).await?;
+
         let response_json: serde_json::Value =
             serde_json::from_str(&response_text.as_string().unwrap())
                 .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-        Ok(response_json["trash_id"].as_str().unwrap().to_string())
+        Ok(response_json["data"]["trash_id"]
+            .as_str()
+            .unwrap()
+            .to_string())
     }
 
     pub async fn download_chunk(&self, trash_id: &str, file_id: &str) -> Result<Vec<u8>, JsValue> {

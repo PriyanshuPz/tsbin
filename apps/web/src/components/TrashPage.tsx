@@ -1,100 +1,95 @@
 import { useParams } from "react-router-dom";
-import { useTextTrashContent, useTrash } from "../lib/queries";
-import { useEffect, useState } from "react";
 import TextTrash from "./TextTrash";
+import FileTrash from "./FileTrash";
+import { TrashProvider, useTrashContext } from "../context/useTrashContext";
 
-export default function TrashPage() {
-  const { id } = useParams<{ id: string }>();
-  const [passcode, setPasscode] = useState<string>("");
+function TrashPageContent() {
   const {
-    data: trash,
-    isLoading: loadingTrash,
-    isError: errorLoadingTrash,
-  } = useTrash(id || "");
+    trash,
+    trashContent,
+    passcode,
+    setPasscode,
+    isLoadingTrash,
+    isLoadingContent,
+    errorLoadingTrash,
+    errorLoadingContent,
+    showPasscodeView,
+    submitPasscode,
+  } = useTrashContext();
 
-  const {
-    data: textTrashContent,
-    isPending: loadingTextTrashContent,
-    isError: errorLoadingTextTrashContent,
-    mutate: mutateTextTrashContent,
-  } = useTextTrashContent();
-
-  useEffect(() => {
-    if (trash && !trash.encrypted && trash.type === "TEXT") {
-      mutateTextTrashContent({
-        id: trash.objectId,
-        passcode: "0000",
-      });
-    }
-
-    return () => {
-      // Cleanup if necessary
-      setPasscode("");
-    };
-  }, [trash, mutateTextTrashContent]);
-
-  if (loadingTrash) {
-    return <div>Loading...</div>;
+  if (isLoadingTrash) {
+    return <div className="loading">Loading...</div>;
   }
 
   if (errorLoadingTrash) {
-    return <div>Error loading trash data.</div>;
+    return <div className="error">Error loading trash data.</div>;
   }
 
   if (!trash) {
-    return <div>No trash data found.</div>;
+    return <div className="error">No trash data found.</div>;
   }
 
-  if (trash.encrypted) {
+  if (showPasscodeView) {
     return (
-      <div>
-        This trash is encrypted. Please enter the passcode to view its contents.
-        <input
-          type="password"
-          value={passcode || ""}
-          onChange={(e) => setPasscode(e.target.value)}
-          placeholder="Enter passcode"
-        />
-        <button
-          onClick={() => {
-            mutateTextTrashContent({
-              id: trash.objectId,
-              passcode: passcode,
-            });
-          }}
-        >
-          Submit
-        </button>
-        {loadingTextTrashContent && <div>Loading content...</div>}
-        {errorLoadingTextTrashContent && (
-          <div>Error loading text trash content.</div>
-        )}
-        {textTrashContent && (
-          <div>
-            <h2>Text Trash Content:</h2>
-            <pre>{textTrashContent.enc_trash_text}</pre>
-          </div>
+      <div className="passcode-container">
+        <h2>🔒 Encrypted Content</h2>
+        <p>
+          This trash is encrypted. Please enter the passcode to view its
+          contents.
+        </p>
+        <div className="passcode-form">
+          <input
+            type="password"
+            value={passcode}
+            onChange={(e) => setPasscode(e.target.value)}
+            placeholder="Enter passcode"
+            className="passcode-input"
+            onKeyPress={(e) => e.key === "Enter" && submitPasscode()}
+          />
+          <button onClick={submitPasscode} className="submit-button">
+            Submit
+          </button>
+        </div>
+        {isLoadingContent && <div className="loading">Loading content...</div>}
+        {errorLoadingContent && (
+          <div className="error">Error loading trash content.</div>
         )}
       </div>
     );
   }
 
   return (
-    <div>
-      {loadingTrash && <div>Loading...</div>}
-      <h2>Text Trash Content:</h2>
-      {textTrashContent && (
-        <div>
-          {trash.type == "TEXT" && (
-            <TextTrash
-              data={textTrashContent}
-              isLoading={loadingTextTrashContent}
-              isError={errorLoadingTextTrashContent}
-            />
+    <div className="trash-content">
+      <div className="trash-header">
+        <h1>📁 Trash Content</h1>
+        <div className="trash-info">
+          <span className="trash-type">{trash.type}</span>
+          {trash.encrypted && (
+            <span className="encrypted-badge">🔒 Encrypted</span>
           )}
         </div>
-      )}
-      {loadingTextTrashContent && <div>Loading content...</div>}
+      </div>
+
+      <div className="content-container">
+        {trash.type === "TEXT" && <TextTrash />}
+        {trash.type === "FILE" && <FileTrash />}
+      </div>
+
+      {isLoadingContent && <div className="loading">Loading content...</div>}
     </div>
+  );
+}
+
+export default function TrashPage() {
+  const { id } = useParams<{ id: string }>();
+
+  if (!id) {
+    return <div>No trash ID provided.</div>;
+  }
+
+  return (
+    <TrashProvider trashId={id}>
+      <TrashPageContent />
+    </TrashProvider>
   );
 }

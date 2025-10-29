@@ -1,4 +1,4 @@
-import init, { TsbinController, Encryptor } from "tsbin-wasm";
+import init, { TsbinController, Encryptor, UploadProgress } from "tsbin-wasm";
 import { SITE_CONFIG } from "./constants";
 
 export async function sendTrash(data: {
@@ -29,7 +29,12 @@ export async function sendTrash(data: {
         throw new Error("files are required for file type");
       }
       const file = data.files[0];
-      trashId = await ts.encrypt_file(file, passcode);
+
+      const onProgress = (progress: UploadProgress) => {
+        console.log("Upload progress:", progress);
+      };
+
+      trashId = await ts.encrypt_file(file, passcode, undefined, onProgress);
     }
 
     return {

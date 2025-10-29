@@ -4,7 +4,7 @@ use js_sys::Uint8Array;
 use serde_json::json;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
-use web_sys::File;
+use web_sys::{File, console};
 
 #[wasm_bindgen]
 pub struct TsbinController {
@@ -89,7 +89,7 @@ impl TsbinController {
         file: File,
         passcode: String,
         options: Option<EncryptionOptions>,
-        progress_callback: Option<ProgressCallback>,
+        progress_callback: Option<js_sys::Function>,
     ) -> Result<String, JsValue> {
         let options = options.unwrap_or_else(|| EncryptionOptions::new());
         let chunk_size = options.chunk_size.unwrap_or(10 * 1024 * 1024);
@@ -137,6 +137,7 @@ impl TsbinController {
                 {
                     Ok(response) => break Ok(response),
                     Err(e) => {
+                        console::log_1(&e);
                         retries += 1;
                         if retries >= max_retries {
                             break Err(format!("Failed after {} retries: {:?}", max_retries, e));
@@ -162,7 +163,10 @@ impl TsbinController {
 
             // Report progress
             if let Some(ref callback) = progress_callback {
-                callback.call(&progress)?;
+                console::log_1(&JsValue::from_str("Reporting progress..."));
+                let progress_js = serde_wasm_bindgen::to_value(&progress)?;
+                console::log_1(&JsValue::from_str("Progress reported."));
+                callback.call1(&JsValue::null(), &progress_js)?;
             }
         }
 
@@ -195,7 +199,9 @@ impl TsbinController {
 
         // Final progress update
         if let Some(ref callback) = progress_callback {
-            callback.call(&progress)?;
+            console::log_1(&JsValue::from_str("Reporting final progress..."));
+            let progress_js = serde_wasm_bindgen::to_value(&progress)?;
+            callback.call1(&JsValue::null(), &progress_js)?;
         }
 
         Ok(trash_id)
@@ -206,14 +212,10 @@ impl TsbinController {
         &self,
         trash_id: String,
         passcode: String,
-        progress_callback: Option<ProgressCallback>,
+        progress_callback: Option<js_sys::Function>,
     ) -> Result<Uint8Array, JsValue> {
         // Get trash metadata
-        let trash_meta = self.client.get_trash_meta(&trash_id).await?;
-
-        if trash_meta.trash_type != "file" {
-            return Err(JsValue::from_str("Not a file trash"));
-        }
+        let trash_meta = self.client.get_file_trash_meta(&trash_id).await?;
 
         let file_ids = trash_meta
             .file_ids
@@ -246,7 +248,10 @@ impl TsbinController {
 
             // Report progress
             if let Some(ref callback) = progress_callback {
-                callback.call(&progress)?;
+                console::log_1(&JsValue::from_str("Reporting progress..."));
+                console::log_1(&JsValue::from_str(&format!("Progress: {:?}", progress)));
+                let progress_js = serde_wasm_bindgen::to_value(&progress)?;
+                callback.call1(&JsValue::null(), &progress_js)?;
             }
         }
 
@@ -265,7 +270,8 @@ impl TsbinController {
 
         progress.completed = true;
         if let Some(ref callback) = progress_callback {
-            callback.call(&progress)?;
+            let progress_js = serde_wasm_bindgen::to_value(&progress)?;
+            callback.call1(&JsValue::null(), &progress_js)?;
         }
 
         Ok(Uint8Array::from(&final_data[..]))

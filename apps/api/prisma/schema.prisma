@@ -56,7 +56,7 @@ model FileTrash {
   id String @id @default(cuid())
 
   file_ids        String[]
-  message_ids     String[]
+  message_ids     Int[]
   chunk_size      Int
   total_chunks    Int
   encryption_type String

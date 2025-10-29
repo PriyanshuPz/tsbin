@@ -44,3 +44,17 @@ export class CreateTextTrashDto {
     passcode_hash: string;
   };
 }
+
+export class CreateFileTrashDto {
+  message_ids: number[];
+  file_ids: string[];
+  encryption_metadata: {
+    passcode_hash: string;
+    expire_at?: Date;
+    original_size: number;
+    total_chunks: number;
+    chunk_size: number;
+    encryption_type: string;
+    filename: string;
+  };
+}

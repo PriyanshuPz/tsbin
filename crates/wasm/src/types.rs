@@ -61,9 +61,9 @@ pub struct TrashMeta {
     pub trash_id: String,
     pub encrypted: bool,
     pub trash_type: String, // "file" | "text"
-    pub expire_at: String,
+    pub expire_at: Option<String>,
     pub file_ids: Option<Vec<String>>,
-    pub message_ids: Option<Vec<String>>,
+    pub message_ids: Option<Vec<u64>>,
     pub total_chunks: Option<u32>,
     pub total_size: Option<u64>,
 }
@@ -72,35 +72,16 @@ pub struct TrashMeta {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChunkUploadResponse {
     pub file_id: String,
-    pub message_id: String,
+    pub message_id: u32,
     pub chunk_index: u32,
 }
 
 #[wasm_bindgen(getter_with_clone)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UploadProgress {
     pub total_chunks: u32,
     pub uploaded_chunks: u32,
     pub failed_chunks: Vec<u32>,
     pub completed: bool,
     pub trash_id: Option<String>,
-}
-
-#[wasm_bindgen]
-pub struct ProgressCallback {
-    callback: js_sys::Function,
-}
-
-#[wasm_bindgen]
-impl ProgressCallback {
-    #[wasm_bindgen(constructor)]
-    pub fn new(callback: js_sys::Function) -> Self {
-        Self { callback }
-    }
-
-    pub fn call(&self, progress: &UploadProgress) -> Result<(), JsValue> {
-        let progress_js = serde_wasm_bindgen::to_value(progress)?;
-        self.callback.call1(&JsValue::NULL, &progress_js)?;
-        Ok(())
-    }
 }

@@ -1,46 +1,13 @@
-import { HttpException, Injectable } from '@nestjs/common';
-import { CreateTextTrashDto, CreateTrashDto } from './dto/create-trash.dto';
-import { AppwriteService } from 'src/appwrite/appwrite.service';
-import { TelegramService } from 'src/telegram/telegram.service';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
+import { CreateFileTrashDto, CreateTextTrashDto } from './dto/create-trash.dto';
 import { generateId, id } from 'src/lib/utils';
 import { ErrorResponse } from 'src/lib/exception-filter';
 import { PrismaService } from 'src/service/prisma.service';
 
 @Injectable()
 export class TrashService {
-  constructor(
-    private readonly appwriteService: AppwriteService,
-    private readonly telegramService: TelegramService,
-    private readonly prismaService: PrismaService,
-  ) {}
-
-  async create(createTrashDto: CreateTrashDto) {
-    const {
-      type,
-      encryptedContent,
-      encryptedFiles,
-      meta,
-      passcodeHash,
-      expireAt,
-    } = createTrashDto;
-
-    if (type === 'text') {
-      // return this.createTextTrash({
-      //   encryptedContent,
-      //   meta,
-      //   passcodeHash,
-      //   expireAt,
-      // });
-    } else if (type === 'file') {
-      return this.createFileTrash({
-        encryptedFiles,
-        passcodeHash,
-        expireAt,
-      });
-    } else {
-      throw new Error('Unsupported trash type');
-    }
-  }
+  private readonly logger = new Logger(TrashService.name);
+  constructor(private readonly prismaService: PrismaService) {}
 
   async createTextTrash({
     enc_trash_text,
@@ -85,128 +52,53 @@ export class TrashService {
     }
   }
 
-  private async createFileTrash({
-    encryptedFiles,
-    passcodeHash,
-    expireAt,
-  }: {
-    encryptedFiles?: Array<{
-      encryptedContent?: string;
-      meta: any;
-      messageIds?: number[];
-      fileIds?: string[];
-    }>;
-    passcodeHash: string;
-    expireAt?: Date;
-  }) {
-    if (!encryptedFiles || encryptedFiles.length === 0) {
-      throw new Error('encryptedFiles is required for file type');
+  async createFileTrash({
+    encryption_metadata,
+    file_ids,
+    message_ids,
+  }: CreateFileTrashDto) {
+    if (!encryption_metadata || !file_ids || file_ids.length === 0) {
+      throw new Error('Missing required fields: encryption_metadata, file_ids');
     }
 
     const slug = generateId('ts');
-    let totalSize = 0;
-    let fileMetadata: Array<{
-      message_id: number;
-      meta: any;
-      file_id: string;
-      originalSize: number;
-    }> = [];
 
     try {
-      // Handle new chunked system (with messageIds)
-      if (encryptedFiles[0].messageIds) {
-        // For chunked files, we already have message IDs from the chunk uploads
-        for (const encryptedFile of encryptedFiles) {
-          const { meta, messageIds, fileIds } = encryptedFile;
-
-          if (messageIds && messageIds.length > 0) {
-            // Add each chunk as a file entry
-            for (let i = 0; i < messageIds.length; i++) {
-              const messageId = messageIds[i];
-              const file_id = fileIds ? fileIds[i] : '';
-              fileMetadata.push({
-                message_id: messageId,
-                meta: meta,
-                originalSize: meta.fileSize,
-                file_id,
-              });
-            }
-            totalSize += meta.fileSize;
-          }
-        }
-      }
-      // Handle legacy system (with encryptedContent)
-      else {
-        for (const encryptedFile of encryptedFiles) {
-          const { encryptedContent, meta } = encryptedFile;
-
-          if (!encryptedContent) {
-            throw new Error(
-              'encryptedContent is required for legacy file type',
-            );
-          }
-
-          // Convert base64 encrypted content back to buffer for Telegram
-          const fileBuffer = Buffer.from(encryptedContent, 'base64');
-          totalSize += fileBuffer.length;
-
-          // Upload to Telegram with original filename
-          const uploadResult = await this.telegramService.uploadFile(
-            fileBuffer,
-            meta.fileName,
-            `Encrypted file: ${meta.fileName} (Size: ${meta.fileSize} bytes)`,
-          );
-
-          fileMetadata.push({
-            message_id: uploadResult.message_id,
-            file_id: uploadResult.file_id,
-            meta: meta,
-            originalSize: meta.fileSize,
-          });
-        }
-      }
-
-      // Store file metadata in database
-      const data = {
-        type: 'file',
-        content: JSON.stringify({
-          files: fileMetadata,
-        }),
-        encryption_meta: JSON.stringify({
-          algorithm: 'AES-GCM',
-          fileCount: encryptedFiles.length,
-        }),
-        passcode_hash: passcodeHash,
-        encrypted: passcodeHash !== '0000',
-        slug,
-        views: 0,
-        expires_at: expireAt || null,
-        size: totalSize,
-        message_ids: fileMetadata.map((f) => f.message_id),
-        chat_id: '',
-      };
-
-      const rec = await this.appwriteService.getDb().createRow({
-        rowId: slug,
-        data: data,
-        databaseId: this.appwriteService.getDatabaseId(),
-        tableId: 'trash',
+      const trash = await this.prismaService.trash.create({
+        data: {
+          id: id('ts'),
+          slug,
+          type: 'FILE',
+          encrypted: encryption_metadata.passcode_hash !== '0000',
+          passcodeHash: encryption_metadata.passcode_hash,
+          expireAt: encryption_metadata.expire_at,
+          fileTrash: {
+            create: {
+              id: id('ft'),
+              file_ids,
+              file_size: encryption_metadata.original_size,
+              total_chunks: encryption_metadata.total_chunks,
+              chunk_size: encryption_metadata.chunk_size,
+              encryption_type: encryption_metadata.encryption_type,
+              message_ids,
+              original_name: encryption_metadata.filename,
+            },
+          },
+        },
       });
 
-      return rec.slug;
+      if (!trash) {
+        throw new Error('Trash creation failed');
+      }
+
+      return slug;
     } catch (error) {
+      this.logger.error(`Error creating file trash: ${error}`);
       throw new ErrorResponse(
-        `BAAS: Failed to create file trash - ${error.message}`,
+        `DB: Failed to create file trash - ${error.message}`,
         500,
       );
     }
-  }
-
-  findAll() {
-    return {
-      message: `Not implemented yet`,
-      data: [],
-    };
   }
 
   async findOne(id: string) {
@@ -250,7 +142,6 @@ export class TrashService {
           },
         },
       });
-
       if (!trash) {
         throw new Error('Trash not found');
       }
@@ -273,6 +164,7 @@ export class TrashService {
         message: 'Trash retrieved successfully',
       };
     } catch (error) {
+      this.logger.error(`Error finding trash by ID: ${error}`);
       throw new ErrorResponse(
         `DB: Failed to find trash by ID - ${error.message}`,
         500,
@@ -293,10 +185,26 @@ export class TrashService {
 
       return textTrash;
     } catch (error) {
-      throw new ErrorResponse(
-        `DB: Failed to find text trash by ID - ${error.message}`,
-        500,
-      );
+      this.logger.error(`Error finding text trash by ID: ${id} - ${error}`);
+      throw new ErrorResponse(error, 500);
+    }
+  }
+
+  async findFileTrashById(id: string) {
+    try {
+      const fileTrash = await this.prismaService.fileTrash.findUnique({
+        where: {
+          id,
+        },
+        include: {
+          trash: true,
+        },
+      });
+
+      return fileTrash;
+    } catch (error) {
+      this.logger.error(`Error finding file trash by ID: ${id} - ${error}`);
+      throw new ErrorResponse(error, 500);
     }
   }
 }
