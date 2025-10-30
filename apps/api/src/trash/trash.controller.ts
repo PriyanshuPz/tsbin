@@ -38,11 +38,8 @@ export class TrashController {
         data: { trash_id: trashId },
       };
     } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      this.logger.error('Error creating text trash:', error);
+      throw new HttpException(error.message, 500);
     }
   }
 
@@ -91,11 +88,8 @@ export class TrashController {
         data: { trash_id: trashId },
       };
     } catch (error) {
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      this.logger.error('Error creating file trash:', error);
+      throw new HttpException(error.message, 500);
     }
   }
 
@@ -127,6 +121,7 @@ export class TrashController {
         },
       };
     } catch (error) {
+      this.logger.error('Error fetching file trash content:', error);
       throw new HttpException(error.message, 500);
     }
   }
