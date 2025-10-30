@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "vercel:setup": "curl https://sh.rustup.rs -sSf | sh -s -- -y && source $HOME/.cargo/env && cargo install wasm-pack",
     "build:wasm": "cd crates/wasm && wasm-pack build --target web --out-dir ../../packages/tsbin-wasm/",
+    "vercel:deps": "bun run vercel:setup && bun install",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "docs": "turbo run dev --filter=docs"
@@ -16,8 +18,5 @@
   "packageManager": "bun@1.2.0",
   "devDependencies": {
     "turbo": "2.5.8"
-  },
-  "dependencies": {
-    "react-hook-form": "^7.65.0"
   }
 }
