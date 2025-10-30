@@ -1,0 +1,24 @@
+name: Publish WASM
+on:
+  push:
+    branches: [master]
+    paths:
+      - "crates/wasm/**"
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust + wasm-pack
+        run: |
+          curl https://sh.rustup.rs -sSf | sh -s -- -y
+          source $HOME/.cargo/env
+          cargo install wasm-pack
+      - name: Build wasm
+        run: npm run build:wasm
+      - name: Push to tsbin-wasm branch
+        run: |
+          git config user.name Priyanshu Verma
+          git config user.email priyanshuverma@outlook.in
+          git subtree push --prefix packages/tsbin-wasm origin tsbin-wasm

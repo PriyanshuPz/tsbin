@@ -11,6 +11,7 @@
     "vercel:setup": "curl https://sh.rustup.rs -sSf | sh -s -- -y && source $HOME/.cargo/env && cargo install wasm-pack",
     "build:wasm": "cd crates/wasm && wasm-pack build --target web --out-dir ../../packages/tsbin-wasm/",
     "vercel:deps": "bun run vercel:setup && bun install",
+    "publish:wasm": "cd crates/wasm && wasm-pack build --target web --out-dir ../../packages/tsbin-wasm && git subtree push --prefix packages/tsbin-wasm origin tsbin-wasm",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "docs": "turbo run dev --filter=docs"
