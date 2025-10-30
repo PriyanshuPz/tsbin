@@ -1,6 +1,9 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
+    "vercel:deps": {
+      "cache": false
+    },
     "build": {
       "dependsOn": ["^build", "^build:wasm"],
       "outputs": ["dist/**"]
