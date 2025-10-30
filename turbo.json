@@ -2,8 +2,8 @@
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "target/**"]
+      "dependsOn": ["^build", "^build:wasm"],
+      "outputs": ["dist/**"]
     },
     "dev": { "persistent": true, "cache": false },
     "lint": {},
