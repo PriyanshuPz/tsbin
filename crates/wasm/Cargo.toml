@@ -3,6 +3,7 @@ name = "tsbin-wasm"
 version = "0.1.0"
 edition = "2024"
 authors = ["Priyanshu Verma <priyanshuverma@outlook.in>"]
+repository = "https://github.com/PriyanshuPz/tsbin"
 
 [lib]
 crate-type = ["cdylib"]

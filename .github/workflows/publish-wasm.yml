@@ -17,8 +17,12 @@ jobs:
           cargo install wasm-pack
       - name: Build wasm
         run: npm run build:wasm
+
+      - name: Delete .gitignore in tsbin-wasm
+        run: rm -f packages/tsbin-wasm/.gitignore
+
       - name: Push to tsbin-wasm branch
         run: |
-          git config user.name Priyanshu Verma
-          git config user.email priyanshuverma@outlook.in
+          git config user.name "Priyanshu Verma"
+          git config user.email "priyanshuverma@outlook.in"
           git subtree push --prefix packages/tsbin-wasm origin tsbin-wasm
