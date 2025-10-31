@@ -9,7 +9,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "build:wasm": "cd crates/wasm && wasm-pack build --target web --out-dir ../../packages/tsbin-wasm/ --release",
-    "publish:wasm": "bun run build:wasm && git add -f packages/tsbin-wasm && git commit -m 'update wasm build' --no-verify && git subtree push --prefix packages/tsbin-wasm origin tsbin-wasm",
+    "publish:wasm": "bun run build:wasm && git subtree split --prefix packages/tsbin-wasm -b tsbin-wasm-temp && git push origin tsbin-wasm-temp:tsbin-wasm --force && git branch -D tsbin-wasm-temp",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "docs": "turbo run dev --filter=docs"

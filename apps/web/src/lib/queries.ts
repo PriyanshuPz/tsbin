@@ -1,6 +1,10 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { SITE_CONFIG } from "./constants";
-import init, { TsbinController, UploadProgress } from "tsbin-wasm";
+import init, {
+  TsbinController,
+  UploadProgress as WasmUploadProgress,
+} from "tsbin-wasm";
+import { sendTrash } from "./apis";
 
 type TrashType = "TEXT" | "FILE";
 
@@ -13,6 +17,14 @@ export type TrashData = {
   encrypted: boolean;
   createdAt: Date;
   objectId: string;
+};
+
+export type UploadProgressData = {
+  percentage: number;
+  uploadedChunks: number;
+  totalChunks: number;
+  failedChunks: number[];
+  completed: boolean;
 };
 
 export const useTrash = (id: string) =>
@@ -79,7 +91,14 @@ export type FileTrashContent = {
   fileData?: any;
 };
 
-export const useFileTrashContent = () =>
+export const useFileTrashContent = (
+  onProgress?: (progress: {
+    percentage: number;
+    uploadedChunks: number;
+    totalChunks: number;
+    failedChunks: number[];
+  }) => void
+) =>
   useMutation({
     retry(_, error) {
       if (
@@ -104,8 +123,22 @@ export const useFileTrashContent = () =>
         const obj = await ts.decrypt_file(
           id,
           passcode,
-          (progress: UploadProgress) => {
-            console.log(`Decryption progress: ${progress}%`);
+          (progress: WasmUploadProgress) => {
+            console.log(`Decryption progress:`, progress);
+            // Calculate percentage from progress data
+            const percentage =
+              progress.total_chunks > 0
+                ? Math.round(
+                    (progress.uploaded_chunks / progress.total_chunks) * 100
+                  )
+                : 0;
+
+            onProgress?.({
+              percentage,
+              uploadedChunks: progress.uploaded_chunks,
+              totalChunks: progress.total_chunks,
+              failedChunks: Array.from(progress.failed_chunks),
+            });
           }
         );
 
@@ -126,5 +159,29 @@ export const useFileTrashContent = () =>
         console.error("Error in useFileTrashContent:", error);
         throw new Error(error.message);
       }
+    },
+  });
+
+export const useSendTrash = (
+  onProgress?: (progress: UploadProgressData) => void
+) =>
+  useMutation({
+    mutationFn: async (data: {
+      type: "text" | "file";
+      textContent?: string;
+      files?: File[];
+      passcode?: string;
+      expireAt?: Date;
+    }) => {
+      const result = await sendTrash({
+        ...data,
+        onProgress,
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || "Failed to send trash");
+      }
+
+      return result.data;
     },
   });

@@ -25,6 +25,12 @@ interface TrashContextType {
   errorLoadingContent: boolean;
   showPasscodeView: boolean;
   submitPasscode: () => void;
+  decryptionProgress: {
+    percentage: number;
+    uploadedChunks: number;
+    totalChunks: number;
+    failedChunks: number[];
+  } | null;
 }
 
 const TrashContext = createContext<TrashContextType | undefined>(undefined);
@@ -37,6 +43,12 @@ interface TrashProviderProps {
 export function TrashProvider({ children, trashId }: TrashProviderProps) {
   const [passcode, setPasscode] = useState<string>("");
   const [showPasscodeView, setShowPasscodeView] = useState<boolean>(false);
+  const [decryptionProgress, setDecryptionProgress] = useState<{
+    percentage: number;
+    uploadedChunks: number;
+    totalChunks: number;
+    failedChunks: number[];
+  } | null>(null);
 
   const {
     data: trash,
@@ -56,7 +68,16 @@ export function TrashProvider({ children, trashId }: TrashProviderProps) {
     isPending: isLoadingFileContent,
     isError: errorLoadingFileContent,
     mutate: mutateFileTrashContent,
-  } = useFileTrashContent();
+  } = useFileTrashContent(
+    (progress: {
+      percentage: number;
+      uploadedChunks: number;
+      totalChunks: number;
+      failedChunks: number[];
+    }) => {
+      setDecryptionProgress(progress);
+    }
+  );
 
   // Determine current content and loading states
   const trashContent =
@@ -69,6 +90,14 @@ export function TrashProvider({ children, trashId }: TrashProviderProps) {
   // Handle automatic content loading for non-encrypted trash
   useEffect(() => {
     if (trash && !trash.encrypted) {
+      // Initialize progress for non-encrypted files too
+      setDecryptionProgress({
+        percentage: 0,
+        uploadedChunks: 0,
+        totalChunks: 0,
+        failedChunks: [],
+      });
+
       if (trash.type === "TEXT") {
         mutateTextTrashContent({
           id: trash.objectId,
@@ -90,11 +119,27 @@ export function TrashProvider({ children, trashId }: TrashProviderProps) {
   useEffect(() => {
     if (trashContent && trash?.encrypted) {
       setShowPasscodeView(false);
+      // Reset progress when content is loaded
+      setTimeout(() => setDecryptionProgress(null), 1000);
+    }
+  }, [trashContent, trash?.encrypted]);
+
+  // Also handle successful content loading for non-encrypted trash
+  useEffect(() => {
+    if (trashContent && !trash?.encrypted) {
+      // Reset progress when content is loaded for non-encrypted files too
+      setTimeout(() => setDecryptionProgress(null), 1000);
     }
   }, [trashContent, trash?.encrypted]);
 
   const submitPasscode = () => {
     if (trash && passcode) {
+      setDecryptionProgress({
+        percentage: 0,
+        uploadedChunks: 0,
+        totalChunks: 0,
+        failedChunks: [],
+      }); // Initialize progress
       if (trash.type === "TEXT") {
         mutateTextTrashContent({
           id: trash.objectId,
@@ -120,6 +165,7 @@ export function TrashProvider({ children, trashId }: TrashProviderProps) {
     errorLoadingContent,
     showPasscodeView,
     submitPasscode,
+    decryptionProgress,
   };
 
   return (

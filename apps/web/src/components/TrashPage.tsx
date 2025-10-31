@@ -20,10 +20,36 @@ function TrashPageContent() {
   if (isLoadingTrash) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg border border-gray-200 p-8 max-w-md w-full mx-4">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 max-w-md w-full mx-4">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-            <p className="text-sm text-gray-600">Loading trash...</p>
+            {/* Enhanced loading animation */}
+            <div className="relative mx-auto mb-6 w-16 h-16">
+              <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-gray-900 rounded-full animate-spin"></div>
+              <div className="absolute inset-2 bg-gray-100 rounded-full flex items-center justify-center">
+                <span className="text-xl">📦</span>
+              </div>
+            </div>
+
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              🔍 Loading Trash
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Fetching your secure content...
+            </p>
+
+            {/* Animated dots */}
+            <div className="flex justify-center space-x-1">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                  style={{
+                    animationDelay: `${i * 0.1}s`,
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -200,15 +226,6 @@ function TrashPageContent() {
       <div className="max-w-2xl mx-auto px-6 py-8">
         {trash.type === "TEXT" && <TextTrash />}
         {trash.type === "FILE" && <FileTrash />}
-
-        {isLoadingTrash && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 mt-6">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto mb-2"></div>
-              <p className="text-sm text-gray-600">Loading content...</p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

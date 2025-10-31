@@ -19,7 +19,8 @@
     "react-hook-form": "^7.65.0",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.4",
-    "tsbin-wasm": "github:PriyanshuPz/tsbin#tsbin-wasm"
+    "tsbin-wasm": "github:PriyanshuPz/tsbin#tsbin-wasm",
+    "vite-plugin-wasm": "^3.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

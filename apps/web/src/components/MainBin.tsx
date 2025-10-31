@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import type { DragEvent, ChangeEvent } from "react";
-import { sendTrash } from "../lib/apis";
+import { useSendTrash, type UploadProgressData } from "../lib/queries";
 
 interface MainBinProps {}
 
@@ -24,10 +24,14 @@ export default function MainBin({}: MainBinProps) {
   const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<FilePreview | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] =
+    useState<UploadProgressData | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const sendTrashMutation = useSendTrash((progress: UploadProgressData) => {
+    setUploadProgress(progress);
+  });
 
   const {
     register,
@@ -119,7 +123,7 @@ export default function MainBin({}: MainBinProps) {
   };
 
   const handleSubmit = async (data: FormData) => {
-    if (isSubmitting) return;
+    if (sendTrashMutation.isPending) return;
 
     if (!data.textContent.trim() && !selectedFile) {
       toast.error("Please enter some text or select a file to upload.");
@@ -139,18 +143,14 @@ export default function MainBin({}: MainBinProps) {
       return;
     }
 
-    setIsSubmitting(true);
-    setUploadProgress(0);
-
-    // Simulate upload progress
-    let progressInterval: number | undefined;
-    progressInterval = window.setInterval(() => {
-      setUploadProgress((p) => {
-        if (p === null) return 5;
-        const next = Math.min(90, p + Math.random() * 12);
-        return Math.round(next);
-      });
-    }, 400) as unknown as number;
+    // Initialize progress
+    setUploadProgress({
+      percentage: 0,
+      uploadedChunks: 0,
+      totalChunks: 0,
+      failedChunks: [],
+      completed: false,
+    });
 
     const loadingToast = toast.loading("Creating your trash...");
 
@@ -158,50 +158,49 @@ export default function MainBin({}: MainBinProps) {
       const hasText = data.textContent.trim().length > 0;
       const hasFile = selectedFile !== null;
 
-      let result;
+      let mutationData;
 
       if (hasFile) {
-        result = await sendTrash({
-          type: "file",
+        mutationData = {
+          type: "file" as const,
           textContent: hasText ? data.textContent : undefined,
           files: [selectedFile.file],
           passcode: data.passcode || undefined,
           expireAt: data.expireAt ? new Date(data.expireAt) : undefined,
-        });
+        };
       } else if (hasText) {
-        result = await sendTrash({
-          type: "text",
+        mutationData = {
+          type: "text" as const,
           textContent: data.textContent,
           passcode: data.passcode || undefined,
           expireAt: data.expireAt ? new Date(data.expireAt) : undefined,
-        });
+        };
       }
 
-      toast.dismiss(loadingToast);
+      if (mutationData) {
+        const result = await sendTrashMutation.mutateAsync(mutationData);
 
-      if (result?.success) {
-        setUploadProgress(100);
+        toast.dismiss(loadingToast);
+
+        // Set final progress state
+        setUploadProgress((prev) =>
+          prev ? { ...prev, percentage: 100, completed: true } : null
+        );
         toast.success("Trash created successfully! Redirecting...");
 
         reset();
         setSelectedFile(null);
 
         setTimeout(() => {
-          navigate(`/t/${result.data}`);
+          navigate(`/t/${result}`);
         }, 900);
-      } else {
-        toast.error(
-          result?.message || "Failed to create trash. Please try again."
-        );
       }
     } catch (error) {
       toast.dismiss(loadingToast);
       console.error("Error submitting trash:", error);
       toast.error("An error occurred. Please try again.");
     } finally {
-      setIsSubmitting(false);
       setTimeout(() => setUploadProgress(null), 600);
-      if (progressInterval) window.clearInterval(progressInterval);
     }
   };
 
@@ -434,20 +433,140 @@ export default function MainBin({}: MainBinProps) {
 
           {/* Upload Progress */}
           {uploadProgress !== null && (
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                    <span>Uploading...</span>
-                    <span>{uploadProgress}%</span>
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+              {/* Header with icon and title */}
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="relative">
+                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm">🚀</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1">
-                    <div
-                      className="bg-gray-900 h-1 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
+                  {uploadProgress.completed && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white">
+                      <span className="text-xs text-white">✓</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-gray-900">
+                    {uploadProgress.completed
+                      ? "✅ Upload Complete!"
+                      : "📤 Uploading File"}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {uploadProgress.completed
+                      ? "Your file has been securely uploaded"
+                      : "Encrypting and uploading your file chunks..."}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-gray-900">
+                    {uploadProgress.percentage}%
                   </div>
                 </div>
+              </div>
+
+              {/* Enhanced progress bar */}
+              <div className="space-y-3">
+                <div className="bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-500 ease-out relative"
+                    style={{ width: `${uploadProgress.percentage}%` }}
+                  >
+                    {uploadProgress.percentage > 0 && (
+                      <div className="absolute inset-0 bg-white bg-opacity-30 animate-pulse rounded-full"></div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Detailed progress info */}
+                {uploadProgress.totalChunks > 0 && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="grid grid-cols-2 gap-4 text-xs mb-3">
+                      <div>
+                        <span className="text-gray-500 block">
+                          Chunks Uploaded
+                        </span>
+                        <span className="font-medium text-gray-900">
+                          {uploadProgress.uploadedChunks} /{" "}
+                          {uploadProgress.totalChunks}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block">Status</span>
+                        <span
+                          className={`font-medium ${
+                            uploadProgress.completed
+                              ? "text-green-600"
+                              : uploadProgress.failedChunks.length > 0
+                                ? "text-red-600"
+                                : "text-blue-600"
+                          }`}
+                        >
+                          {uploadProgress.completed
+                            ? "Complete"
+                            : uploadProgress.failedChunks.length > 0
+                              ? `${uploadProgress.failedChunks.length} Failed`
+                              : "Processing"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Chunk visualization for smaller files */}
+                    {uploadProgress.totalChunks <= 20 && (
+                      <div>
+                        <span className="text-xs text-gray-500 block mb-2">
+                          Chunk Progress
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(
+                            { length: uploadProgress.totalChunks },
+                            (_, i) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-sm transition-all duration-300 ${
+                                  i < uploadProgress.uploadedChunks
+                                    ? "bg-green-500 shadow-sm"
+                                    : uploadProgress.failedChunks.includes(i)
+                                      ? "bg-red-500"
+                                      : "bg-gray-300"
+                                }`}
+                                title={`Chunk ${i + 1}`}
+                              />
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Error indicator */}
+                    {uploadProgress.failedChunks.length > 0 && (
+                      <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-md">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-red-500 text-xs">⚠️</span>
+                          <span className="text-xs text-red-700">
+                            {uploadProgress.failedChunks.length} chunk(s) failed
+                            to upload
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Processing animation */}
+                {!uploadProgress.completed && (
+                  <div className="flex justify-center space-x-1">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                        style={{
+                          animationDelay: `${i * 0.1}s`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -456,14 +575,18 @@ export default function MainBin({}: MainBinProps) {
           <div className="text-center">
             <button
               type="submit"
-              disabled={(!textContent?.trim() && !selectedFile) || isSubmitting}
+              disabled={
+                (!textContent?.trim() && !selectedFile) ||
+                sendTrashMutation.isPending
+              }
               className={`px-8 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
-                (!textContent?.trim() && !selectedFile) || isSubmitting
+                (!textContent?.trim() && !selectedFile) ||
+                sendTrashMutation.isPending
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : "bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-950 shadow-sm hover:shadow"
               }`}
             >
-              {isSubmitting ? (
+              {sendTrashMutation.isPending ? (
                 <span className="flex items-center space-x-2">
                   <svg
                     className="animate-spin w-4 h-4"
