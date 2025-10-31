@@ -310,7 +310,7 @@ export function hash_passphrase(passphrase) {
     }
 }
 
-function __wbg_adapter_10(arg0, arg1, arg2) {
+function __wbg_adapter_6(arg0, arg1, arg2) {
     wasm.closure76_externref_shim(arg0, arg1, arg2);
 }
 
@@ -1471,7 +1471,7 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbindgen_cast_5d20a5358f99a210 = function(arg0, arg1) {
         // Cast intrinsic for `Closure(Closure { dtor_idx: 75, function: Function { arguments: [Externref], shim_idx: 76, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, 75, __wbg_adapter_10);
+        const ret = makeMutClosure(arg0, arg1, 75, __wbg_adapter_6);
         return ret;
     };
     imports.wbg.__wbindgen_cast_d6cd19b81560fd6e = function(arg0) {
